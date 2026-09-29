@@ -8,7 +8,7 @@
 #include "ui/clay/ClayUi.h"
 #include "ui/theme/Colors.h"
 #include "ui/theme/Theme.h"
-#include "utils/BuildInfo.h"
+#include "build.h"
 #include "utils/Platform.h"
 #include "utils/Paths.h"
 

@@ -1,5 +1,6 @@
-#include "utils/BuildInfo.h"
+#include "build.h"
 
+// neoretro Version information
 const char gBuildVersion[] = "@PROJECT_BUILD_NAME@ (@CMAKE_PROJECT_VERSION_MAJOR@.@CMAKE_PROJECT_VERSION_MINOR@.@CMAKE_PROJECT_VERSION_PATCH@)";
 const uint16_t gBuildVersionMajor = @CMAKE_PROJECT_VERSION_MAJOR@;
 const uint16_t gBuildVersionMinor = @CMAKE_PROJECT_VERSION_MINOR@;
@@ -11,6 +12,7 @@ const char gGitCommitTag[] = "@CMAKE_PROJECT_GIT_COMMIT_TAG@";
 
 const char gBuildTeam[] = "@PROJECT_TEAM@";
 const char gBuildDate[] = __DATE__ " " __TIME__;
+const char gBuildMakeOption[] = "";
 
 const uint32_t gVersionCode = @NEORETRO_VERSION_CODE@;
 const char gRepositoryUrl[] = "@NEORETRO_REPOSITORY_URL@";

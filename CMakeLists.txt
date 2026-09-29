@@ -115,8 +115,8 @@ set(NEORETRO_REPOSITORY_URL "https://github.com/HarbourMasters/retro" CACHE STRI
 set(NEORETRO_RELEASE_JSON_URL "https://raw.githubusercontent.com/HarbourMasters/retro/main/release.json" CACHE STRING "Empty disables the update check")
 set(NEORETRO_RELEASES_URL "https://github.com/HarbourMasters/retro/releases/latest" CACHE STRING "Opened from the update banner")
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/properties.h.in ${CMAKE_CURRENT_BINARY_DIR}/properties.h @ONLY)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/build.cpp.in ${CMAKE_CURRENT_BINARY_DIR}/build.cpp @ONLY)
+configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/src/build.cpp.in ${CMAKE_CURRENT_SOURCE_DIR}/src/build.cpp @ONLY)
+configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/properties.h.in ${CMAKE_CURRENT_SOURCE_DIR}/properties.h @ONLY)
 
 # Collect source files to build the executable
 file(GLOB_RECURSE ALL_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS
@@ -139,8 +139,6 @@ endforeach()
 set(CORE_FILES ${ALL_FILES})
 list(FILTER CORE_FILES INCLUDE REGEX "^src/(otr|image|models|games)/|^src/services/(TextureBuilder|OtrGenerator|TextureReplacement|FontGenerator)\\.|^src/utils/(Hash|Paths)\\.")
 list(REMOVE_ITEM ALL_FILES ${CORE_FILES})
-
-list(APPEND ALL_FILES ${CMAKE_CURRENT_BINARY_DIR}/build.cpp)
 
 add_executable(${PROJECT_NAME} ${ALL_FILES})
 add_library(${PROJECT_NAME}-core STATIC ${CORE_FILES})

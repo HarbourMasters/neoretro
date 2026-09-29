@@ -1,5 +1,5 @@
 #include "app/Application.h"
-#include "utils/BuildInfo.h"
+#include "build.h"
 #include "utils/Log.h"
 
 #include <spdlog/spdlog.h>

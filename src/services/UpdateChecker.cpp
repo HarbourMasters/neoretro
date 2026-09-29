@@ -1,6 +1,6 @@
 #include "UpdateChecker.h"
 
-#include "utils/BuildInfo.h"
+#include "build.h"
 #include "utils/Jobs.h"
 
 #include <nlohmann/json.hpp>

@@ -6,7 +6,8 @@ _packages/
 out/
 
 # Generated at configure time
-properties.h
+/src/build.cpp
+/properties.h
 
 # Object files / libraries
 *.o
