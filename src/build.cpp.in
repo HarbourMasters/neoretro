@@ -1,0 +1,18 @@
+#include "utils/BuildInfo.h"
+
+const char gBuildVersion[] = "@PROJECT_BUILD_NAME@ (@CMAKE_PROJECT_VERSION_MAJOR@.@CMAKE_PROJECT_VERSION_MINOR@.@CMAKE_PROJECT_VERSION_PATCH@)";
+const uint16_t gBuildVersionMajor = @CMAKE_PROJECT_VERSION_MAJOR@;
+const uint16_t gBuildVersionMinor = @CMAKE_PROJECT_VERSION_MINOR@;
+const uint16_t gBuildVersionPatch = @CMAKE_PROJECT_VERSION_PATCH@;
+
+const char gGitBranch[] = "@CMAKE_PROJECT_GIT_BRANCH@";
+const char gGitCommitHash[] = "@CMAKE_PROJECT_GIT_COMMIT_HASH@";
+const char gGitCommitTag[] = "@CMAKE_PROJECT_GIT_COMMIT_TAG@";
+
+const char gBuildTeam[] = "@PROJECT_TEAM@";
+const char gBuildDate[] = __DATE__ " " __TIME__;
+
+const uint32_t gVersionCode = @NEORETRO_VERSION_CODE@;
+const char gRepositoryUrl[] = "@NEORETRO_REPOSITORY_URL@";
+const char gReleaseJsonUrl[] = "@NEORETRO_RELEASE_JSON_URL@";
+const char gReleasesUrl[] = "@NEORETRO_RELEASES_URL@";

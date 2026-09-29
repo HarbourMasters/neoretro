@@ -1,0 +1,17 @@
+diff --git a/src/archive/SWrapper.cpp b/src/archive/SWrapper.cpp
+index 951b21f..df9ecdc 100644
+--- a/src/archive/SWrapper.cpp
++++ b/src/archive/SWrapper.cpp
+@@ -95,8 +95,10 @@ int32_t SWrapper::Close(void) {
+         SPDLOG_ERROR("Archive already closed");
+         return -1;
+     }
+-    if (SFileCloseArchive(this->hMpq)) {
+-        SPDLOG_ERROR("Error closing archive");
++    const bool closed = SFileCloseArchive(this->hMpq);
++    this->hMpq = nullptr;
++    if (!closed) {
++        SPDLOG_ERROR("Error closing archive {} with error code {}", mPath, GetLastError());
+         return -1;
+     }
+     return 0;

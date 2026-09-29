@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=neoretro
+Exec=neoretro
+Terminal=false
+Icon=neoretro
+Type=Application
+Categories=Utility;
+Comment=An OTR / O2R generation tool

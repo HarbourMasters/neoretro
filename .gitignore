@@ -1,0 +1,39 @@
+# Build output
+build/
+build-*/
+cmake-build-*/
+_packages/
+out/
+
+# Generated at configure time
+properties.h
+
+# Object files / libraries
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+*.app
+*.dSYM/
+*.pdb
+
+# Runtime files
+latest.log
+imgui.ini
+
+# IDE
+.vs/
+.vscode/
+.idea/
+.cache/
+compile_commands.json
+.DS_Store
+
+# vcpkg
+vcpkg/
+
+clang-format.exe
