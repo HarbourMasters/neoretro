@@ -223,6 +223,7 @@ class MpqReader : public ArchiveReader {
     }
 
     std::optional<std::vector<uint8_t>> Read(const std::string& name) override {
+        std::lock_guard lock(mMutex);
         HANDLE file = nullptr;
         if (!SFileOpenFileEx(mHandle, name.c_str(), 0, &file)) {
             SPDLOG_WARN("Skipping file {}: cannot open", name);
@@ -242,6 +243,7 @@ class MpqReader : public ArchiveReader {
 
   private:
     HANDLE mHandle;
+    std::mutex mMutex;
 };
 } // namespace
 

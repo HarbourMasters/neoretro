@@ -1,6 +1,8 @@
 #include "Jobs.h"
 
-#include <atomic>
+#include "ThreadPool.h"
+
+#include <chrono>
 #include <exception>
 #include <spdlog/spdlog.h>
 
@@ -10,27 +12,24 @@ Jobs& Jobs::Instance() {
 }
 
 void Jobs::Run(Work work, Completion onComplete) {
-    auto done = std::make_shared<std::atomic<bool>>(false);
-    std::thread thread([work = std::move(work), done] {
+    auto result = ThreadPool::Instance().Submit([work = std::move(work)] {
         try {
             work();
         } catch (const std::exception& e) { SPDLOG_ERROR("Background job failed: {}", e.what()); } catch (...) {
             SPDLOG_ERROR("Background job failed with an unknown error");
         }
-        done->store(true);
     });
-    mJobs.push_back({ std::move(thread), std::move(done), std::move(onComplete) });
+    mJobs.push_back({ std::move(result), std::move(onComplete) });
 }
 
 void Jobs::Update() {
     for (size_t i = 0; i < mJobs.size();) {
-        if (!mJobs[i].done->load()) {
+        if (mJobs[i].result.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
             i++;
             continue;
         }
         Job job = std::move(mJobs[i]);
         mJobs.erase(mJobs.begin() + (std::ptrdiff_t)i);
-        job.thread.join();
         if (job.onComplete) {
             job.onComplete();
         }
@@ -39,7 +38,7 @@ void Jobs::Update() {
 
 void Jobs::WaitAll() {
     for (auto& job : mJobs) {
-        job.thread.join();
+        job.result.wait();
     }
     mJobs.clear();
 }

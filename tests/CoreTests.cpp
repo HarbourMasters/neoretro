@@ -10,6 +10,7 @@
 #include "services/TextureReplacement.h"
 #include "utils/Hash.h"
 #include "utils/Paths.h"
+#include "utils/ThreadPool.h"
 
 #include <chrono>
 #include <cstdio>
@@ -402,6 +403,38 @@ void TestFontGenerator() {
     CHECK(lit > 1000);
 }
 
+void TestThreadPool() {
+    ThreadPool pool(4);
+    std::vector<int> values(10000, 0);
+    pool.ParallelFor(values.size(), [&](size_t i) { values[i] = (int)i * 2; });
+    bool ordered = true;
+    for (size_t i = 0; i < values.size(); i++) {
+        ordered &= values[i] == (int)i * 2;
+    }
+    CHECK(ordered);
+
+    std::atomic<int> total = 0;
+    std::vector<std::future<void>> outer;
+    for (int i = 0; i < 8; i++) {
+        outer.push_back(pool.Submit([&] { pool.ParallelFor(100, [&](size_t) { total++; }); }));
+    }
+    for (auto& future : outer) {
+        future.wait();
+    }
+    CHECK(total == 800);
+
+    bool threw = false;
+    try {
+        pool.ParallelFor(50, [](size_t i) {
+            if (i == 17) {
+                throw std::runtime_error("boom");
+            }
+        });
+    } catch (const std::runtime_error&) { threw = true; }
+    CHECK(threw);
+    CHECK(pool.Submit([] { return 42; }).get() == 42);
+}
+
 void TestRealArchive() {
     const char* path = std::getenv("NEORETRO_TEST_ARCHIVE");
     if (path == nullptr) {
@@ -462,6 +495,7 @@ int main() {
         { "replace textures flow", TestReplaceTexturesFlow },
         { "generate custom and sequences", TestGenerateCustomAndSequences },
         { "font generator", TestFontGenerator },
+        { "thread pool", TestThreadPool },
         { "real archive", TestRealArchive },
     };
     for (const auto& test : tests) {

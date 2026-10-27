@@ -137,7 +137,7 @@ foreach(source IN LISTS ALL_FILES)
 endforeach()
 
 set(CORE_FILES ${ALL_FILES})
-list(FILTER CORE_FILES INCLUDE REGEX "^src/(otr|image|models|games)/|^src/services/(TextureBuilder|OtrGenerator|TextureReplacement|FontGenerator)\\.|^src/utils/(Hash|Paths)\\.")
+list(FILTER CORE_FILES INCLUDE REGEX "^src/(otr|image|models|games)/|^src/services/(TextureBuilder|OtrGenerator|TextureReplacement|FontGenerator)\\.|^src/utils/(Hash|Paths|ThreadPool)\\.")
 list(REMOVE_ITEM ALL_FILES ${CORE_FILES})
 
 add_executable(${PROJECT_NAME} ${ALL_FILES})

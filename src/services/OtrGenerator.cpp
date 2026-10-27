@@ -4,11 +4,11 @@
 #include "otr/Exporters.h"
 #include "services/TextureBuilder.h"
 #include "utils/Paths.h"
+#include "utils/ThreadPool.h"
 
 #include <algorithm>
 #include <map>
 #include <spdlog/spdlog.h>
-#include <thread>
 
 namespace OtrGenerator {
 namespace {
@@ -58,25 +58,15 @@ void AddTextures(Otr::ArchiveWriter& archive, const std::string& key, std::vecto
         }
     }
 
-    std::atomic<size_t> next = 0;
-    const unsigned workers = std::max(1u, std::thread::hardware_concurrency());
-    std::vector<std::thread> threads;
-    for (unsigned i = 0; i < std::min<size_t>(workers, work.size()); i++) {
-        threads.emplace_back([&] {
-            for (size_t index = next++; index < work.size(); index = next++) {
-                auto texture = TextureBuilder::Process(key, work[index], prependAlt);
-                if (!texture.data) {
-                    onError("Failed to process texture " + texture.archivePath);
-                } else {
-                    archive.Add(texture.archivePath, std::move(*texture.data));
-                }
-                filesProcessed++;
-            }
-        });
-    }
-    for (auto& thread : threads) {
-        thread.join();
-    }
+    ThreadPool::Instance().ParallelFor(work.size(), [&](size_t index) {
+        auto texture = TextureBuilder::Process(key, work[index], prependAlt);
+        if (!texture.data) {
+            onError("Failed to process texture " + texture.archivePath);
+        } else {
+            archive.Add(texture.archivePath, std::move(*texture.data));
+        }
+        filesProcessed++;
+    });
     if (pairs.size() > work.size()) {
         filesProcessed += (int)(pairs.size() - work.size());
     }

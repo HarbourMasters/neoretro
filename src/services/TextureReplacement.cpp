@@ -7,8 +7,10 @@
 #include "otr/Texture.h"
 #include "utils/Hash.h"
 #include "utils/Paths.h"
+#include "utils/ThreadPool.h"
 
 #include <algorithm>
+#include <mutex>
 #include <spdlog/spdlog.h>
 
 namespace TextureReplacement {
@@ -18,11 +20,11 @@ std::string ToLower(std::string value) {
     return value;
 }
 
-void ProcessFile(const std::string& fileName, const std::vector<uint8_t>& data, const fs::path& outputPath,
-                 ExtractedTextures& processed) {
+std::optional<TextureManifestEntry> ProcessFile(const std::string& fileName, const std::vector<uint8_t>& data,
+                                                const fs::path& outputPath) {
     const auto header = Otr::ReadHeader(data);
     if (!header) {
-        return;
+        return std::nullopt;
     }
 
     if (header->type == (uint32_t)Otr::ResourceType::Texture) {
@@ -30,36 +32,37 @@ void ProcessFile(const std::string& fileName, const std::vector<uint8_t>& data, 
         const auto image = texture ? Otr::TextureCodec::ToImage(*texture) : std::nullopt;
         if (!image) {
             SPDLOG_WARN("Could not decode texture {}", fileName);
-            return;
+            return std::nullopt;
         }
         const auto png = ImageIO::EncodePng(*image);
         if (!Paths::WriteFile(fs::path(outputPath) += ".png", png)) {
-            return;
+            return std::nullopt;
         }
         TextureManifestEntry entry;
         entry.hash = Sha256Hex(png);
         entry.textureType = texture->type;
         entry.textureWidth = texture->width;
         entry.textureHeight = texture->height;
-        processed[fileName] = entry;
+        return entry;
     } else if (header->type == (uint32_t)Otr::ResourceType::OoTBackground) {
         const auto background = Otr::Background::Read(data);
         const auto size = background ? ImageIO::JpegSize(background->data) : std::nullopt;
         if (!size) {
             SPDLOG_WARN("Could not decode background {}", fileName);
-            return;
+            return std::nullopt;
         }
         SPDLOG_INFO("Found JPEG background: {}!", fileName);
         if (!Paths::WriteFile(fs::path(outputPath) += ".jpg", background->data)) {
-            return;
+            return std::nullopt;
         }
         TextureManifestEntry entry;
         entry.hash = Sha256Hex(background->data);
         entry.textureType = Otr::TextureType::JPEG32bpp;
         entry.textureWidth = size->first;
         entry.textureHeight = size->second;
-        processed[fileName] = entry;
+        return entry;
     }
+    return std::nullopt;
 }
 } // namespace
 
@@ -128,11 +131,14 @@ std::optional<ProcessedFolder> ProcessFolder(const fs::path& folder) {
         } catch (const std::exception& e) { SPDLOG_ERROR("Invalid aliases.json: {}", e.what()); }
     }
 
-    ProcessedFolder processed;
-    for (const auto& texFile : Paths::ListFilesRecursive(folder)) {
+    const auto files = Paths::ListFilesRecursive(folder);
+    std::vector<std::vector<std::pair<std::string, TexturePair>>> staged(files.size());
+    ThreadPool::Instance().ParallelFor(files.size(), [&](size_t fileIndex) {
+        const auto& texFile = files[fileIndex];
+        auto& out = staged[fileIndex];
         const std::string ext = ToLower(texFile.extension().string());
         if (ext != ".png" && ext != ".jpeg" && ext != ".jpg") {
-            continue;
+            return;
         }
         const std::string relativePath = Paths::Relative(texFile, folder);
         const std::string texPathRelativeToFolder = Paths::WithoutExtension(relativePath);
@@ -187,7 +193,14 @@ std::optional<ProcessedFolder> ProcessFolder(const fs::path& folder) {
             }
 
             manifestEntry->targetName = textureName;
-            processed[Paths::Dirname(textureName)].emplace_back(texFile, *manifestEntry);
+            out.emplace_back(Paths::Dirname(textureName), TexturePair(texFile, *manifestEntry));
+        }
+    });
+
+    ProcessedFolder processed;
+    for (auto& fileEntries : staged) {
+        for (auto& [key, pair] : fileEntries) {
+            processed[key].push_back(std::move(pair));
         }
     }
     return processed;
@@ -211,8 +224,17 @@ std::optional<ExtractedTextures> ProcessOtr(const std::vector<std::string>& otrP
         if (!archive) {
             continue;
         }
-        archive->ForEach([&](const std::string& fileName, const std::vector<uint8_t>& data) {
-            ProcessFile(fileName, data, dir / Paths::FromUtf8(fileName), processed);
+        const auto names = archive->List();
+        std::mutex processedMutex;
+        ThreadPool::Instance().ParallelFor(names.size(), [&](size_t i) {
+            const auto data = archive->Read(names[i]);
+            if (!data) {
+                return;
+            }
+            if (auto entry = ProcessFile(names[i], *data, dir / Paths::FromUtf8(names[i]))) {
+                std::lock_guard lock(processedMutex);
+                processed[names[i]] = std::move(*entry);
+            }
         });
     }
 

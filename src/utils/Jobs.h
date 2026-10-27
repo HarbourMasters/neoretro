@@ -1,10 +1,7 @@
 #pragma once
 
-#include <atomic>
 #include <functional>
-#include <memory>
-#include <mutex>
-#include <thread>
+#include <future>
 #include <vector>
 
 class Jobs {
@@ -20,8 +17,7 @@ class Jobs {
 
   private:
     struct Job {
-        std::thread thread;
-        std::shared_ptr<std::atomic<bool>> done;
+        std::future<void> result;
         Completion onComplete;
     };
 
