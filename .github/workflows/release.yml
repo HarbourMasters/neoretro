@@ -55,8 +55,8 @@ jobs:
           VERSION: ${{ needs.version.outputs.version }}
         run: |
           mkdir -p release
+          (cd artifacts/neoretro-windows-x64 && zip -qr "$GITHUB_WORKSPACE/release/neoretro-$VERSION-windows-x64.zip" .)
           for arch in x64 arm64; do
-            (cd "artifacts/neoretro-windows-$arch" && zip -qr "$GITHUB_WORKSPACE/release/neoretro-$VERSION-windows-$arch.zip" .)
             cp "artifacts/neoretro-linux-$arch/neoretro.appimage" "release/neoretro-$VERSION-linux-$arch.AppImage"
           done
           cp artifacts/neoretro-mac-universal/neoretro.dmg "release/neoretro-$VERSION-mac-universal.dmg"
