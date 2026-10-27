@@ -26,6 +26,8 @@ bool WriteManifest(const std::filesystem::path& path, const ExtractedTextures& e
 
 std::string OutputFolderName(const std::string& otrPath);
 
+std::vector<std::filesystem::path> ListInGlidenOrder(const std::filesystem::path& folder);
+
 std::optional<int> BandIndexOf(const std::string& target);
 std::optional<TextureManifestEntry> ResolveTextureEntry(const nlohmann::json& manifest, const std::string& target);
 } // namespace TextureReplacement

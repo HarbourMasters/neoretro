@@ -17,6 +17,8 @@ You can download the latest build from [here](https://github.com/HarbourMasters6
 - Select `Replace Textures`
 - Follow the in-app instructions for getting set up.
 
+[Texture replacement folders](docs/texture-packs.md) covers `manifest.json` and `aliases.json`, for authoring or converting a pack by hand.
+
 Once you have your textures extracted, enter that folder, find the textures you want to replace, and replace them. Do not worry about the textures you don't want to change, Retro only puts the modified assets into the patch OTR.
 
 Once you've modified your desired textures, go back into Retro and now that you have a texture replacement folder, select the `OOT` folder inside of it.

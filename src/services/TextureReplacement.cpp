@@ -11,6 +11,8 @@
 
 #include <algorithm>
 #include <mutex>
+#include <set>
+#include <spdlog/fmt/fmt.h>
 #include <spdlog/spdlog.h>
 
 namespace TextureReplacement {
@@ -97,6 +99,37 @@ std::optional<TextureManifestEntry> ResolveTextureEntry(const nlohmann::json& ma
     return std::nullopt;
 }
 
+std::vector<fs::path> ListInGlidenOrder(const fs::path& folder) {
+    std::vector<fs::directory_entry> entries;
+    std::error_code ec;
+    for (const auto& entry : fs::directory_iterator(folder, fs::directory_options::skip_permission_denied, ec)) {
+        entries.push_back(entry);
+    }
+    auto sortKey = [](const fs::directory_entry& entry) {
+        std::string name = Paths::ToUtf8(entry.path().filename());
+        std::transform(name.begin(), name.end(), name.begin(), ::toupper);
+        return name;
+    };
+    std::stable_sort(entries.begin(), entries.end(), [&](const fs::directory_entry& a, const fs::directory_entry& b) {
+        return sortKey(a) < sortKey(b);
+    });
+
+    std::vector<fs::path> files;
+    for (const auto& entry : entries) {
+        const std::string name = Paths::ToUtf8(entry.path().filename());
+        if (name.rfind(".", 0) == 0 || name.rfind("~!~", 0) == 0) {
+            continue;
+        }
+        if (entry.is_directory(ec)) {
+            auto nested = ListInGlidenOrder(entry.path());
+            files.insert(files.end(), nested.begin(), nested.end());
+        } else if (entry.is_regular_file(ec)) {
+            files.push_back(entry.path());
+        }
+    }
+    return files;
+}
+
 std::optional<ProcessedFolder> ProcessFolder(const fs::path& folder) {
     const auto manifestText = Paths::ReadText(folder / "manifest.json");
     if (!manifestText) {
@@ -110,10 +143,11 @@ std::optional<ProcessedFolder> ProcessFolder(const fs::path& folder) {
         return std::nullopt;
     }
 
-    std::map<std::string, std::vector<std::string>> aliases;
+    std::vector<std::pair<std::string, std::vector<std::string>>> aliasList;
     if (const auto aliasText = Paths::ReadText(folder / "aliases.json")) {
         try {
-            for (const auto& [source, value] : nlohmann::json::parse(*aliasText).items()) {
+            const auto aliasJson = nlohmann::ordered_json::parse(*aliasText);
+            for (const auto& [source, value] : aliasJson.items()) {
                 std::vector<std::string> targets;
                 if (value.is_array()) {
                     for (const auto& target : value) {
@@ -125,32 +159,66 @@ std::optional<ProcessedFolder> ProcessFolder(const fs::path& folder) {
                 for (auto& target : targets) {
                     target = Paths::Normalize(target.rfind("alt/", 0) == 0 ? target.substr(4) : target);
                 }
-                aliases[Paths::Normalize(source)] = std::move(targets);
+                aliasList.emplace_back(Paths::Normalize(source), std::move(targets));
             }
-            SPDLOG_INFO("Loaded aliases.json with {} source images", aliases.size());
         } catch (const std::exception& e) { SPDLOG_ERROR("Invalid aliases.json: {}", e.what()); }
     }
+    std::map<std::string, std::vector<std::string>> aliases;
+    for (const auto& [source, targets] : aliasList) {
+        aliases[source] = targets;
+    }
+    if (!aliases.empty()) {
+        SPDLOG_INFO("Loaded aliases.json with {} source images", aliases.size());
+    }
 
-    const auto files = Paths::ListFilesRecursive(folder);
-    std::vector<std::vector<std::pair<std::string, TexturePair>>> staged(files.size());
+    std::vector<fs::path> files;
+    for (const auto& file : ListInGlidenOrder(folder)) {
+        const std::string ext = ToLower(file.extension().string());
+        if (ext == ".png" || ext == ".jpeg" || ext == ".jpg") {
+            files.push_back(file);
+        }
+    }
+    std::vector<std::string> relativePaths;
+    relativePaths.reserve(files.size());
+    for (const auto& file : files) {
+        relativePaths.push_back(Paths::Relative(file, folder));
+    }
+    const std::set<std::string> present(relativePaths.begin(), relativePaths.end());
+    std::map<std::string, std::vector<std::string>> movedAliases;
+    for (const auto& [source, targets] : aliasList) {
+        if (source.find('/') != std::string::npos && !present.count(source)) {
+            movedAliases[Paths::Basename(source)] = targets;
+        }
+    }
+
+    struct Outcome {
+        std::string target;
+        std::vector<std::pair<spdlog::level::level_enum, std::string>> logs;
+        std::optional<TextureManifestEntry> entry;
+    };
+    std::vector<std::vector<Outcome>> outcomes(files.size());
+
     ThreadPool::Instance().ParallelFor(files.size(), [&](size_t fileIndex) {
         const auto& texFile = files[fileIndex];
-        auto& out = staged[fileIndex];
-        const std::string ext = ToLower(texFile.extension().string());
-        if (ext != ".png" && ext != ".jpeg" && ext != ".jpg") {
-            return;
-        }
-        const std::string relativePath = Paths::Relative(texFile, folder);
-        const std::string texPathRelativeToFolder = Paths::WithoutExtension(relativePath);
+        const std::string& relativePath = relativePaths[fileIndex];
+        const std::string name = Paths::Basename(relativePath);
 
-        std::vector<std::string> targets = { texPathRelativeToFolder };
+        std::vector<std::string> targets = { Paths::WithoutExtension(relativePath) };
         if (auto it = aliases.find(relativePath); it != aliases.end()) {
             targets = it->second;
-        } else if (auto base = aliases.find(Paths::Basename(relativePath)); base != aliases.end()) {
-            targets = base->second;
+        } else if (auto byName = aliases.find(name); byName != aliases.end()) {
+            targets = byName->second;
+        } else if (auto moved = movedAliases.find(name); moved != movedAliases.end()) {
+            targets = moved->second;
         }
 
         for (const auto& target : targets) {
+            Outcome& outcome = outcomes[fileIndex].emplace_back();
+            outcome.target = target;
+            auto log = [&](spdlog::level::level_enum level, std::string message) {
+                outcome.logs.emplace_back(level, std::move(message));
+            };
+
             std::string textureName = target;
             std::optional<int> stripIndex;
             auto manifestEntry = ResolveTextureEntry(manifest, target);
@@ -160,11 +228,12 @@ std::optional<ProcessedFolder> ProcessFolder(const fs::path& folder) {
                 const std::string base = target.substr(0, target.find_last_of('#'));
                 const auto baseEntry = ResolveTextureEntry(manifest, base);
                 if (baseEntry && !baseEntry->strips) {
-                    SPDLOG_WARN("Skipping {}: {} declares no bands", target, base);
+                    log(spdlog::level::warn, fmt::format("Skipping {}: {} declares no bands", target, base));
                     continue;
                 }
                 if (baseEntry && baseEntry->strips && *bandIndex >= (int)baseEntry->strips->size()) {
-                    SPDLOG_WARN("Skipping {}: {} has only {} bands", target, base, baseEntry->strips->size());
+                    log(spdlog::level::warn,
+                        fmt::format("Skipping {}: {} has only {} bands", target, base, baseEntry->strips->size()));
                     continue;
                 }
                 if (baseEntry && baseEntry->strips) {
@@ -175,32 +244,46 @@ std::optional<ProcessedFolder> ProcessFolder(const fs::path& folder) {
             }
 
             if (!manifestEntry) {
-                SPDLOG_DEBUG("Found file not present in manifest: {}", target);
+                log(spdlog::level::debug, fmt::format("Found file not present in manifest: {}", target));
                 continue;
             }
 
             if (stripIndex) {
                 manifestEntry->stripIndex = stripIndex;
-                SPDLOG_INFO("Staging band {} of {}", *stripIndex, textureName);
+                log(spdlog::level::info, fmt::format("Staging band {} of {}", *stripIndex, textureName));
             } else if (manifestEntry->kind == TextureEntryKind::Replacement) {
                 const auto bytes = Paths::ReadFile(texFile);
                 if (bytes && manifestEntry->hash == Sha256Hex(*bytes)) {
                     continue;
                 }
-                SPDLOG_INFO("Found file with changed hash: {}", textureName);
+                log(spdlog::level::info, fmt::format("Found file with changed hash: {}", textureName));
             } else {
-                SPDLOG_INFO("Staging additive texture: {}", textureName);
+                log(spdlog::level::info, fmt::format("Staging additive texture: {}", textureName));
             }
 
             manifestEntry->targetName = textureName;
-            out.emplace_back(Paths::Dirname(textureName), TexturePair(texFile, *manifestEntry));
+            outcome.entry = std::move(manifestEntry);
         }
     });
 
     ProcessedFolder processed;
-    for (auto& fileEntries : staged) {
-        for (auto& [key, pair] : fileEntries) {
-            processed[key].push_back(std::move(pair));
+    std::map<std::string, std::string> suppliedBy;
+    for (size_t fileIndex = 0; fileIndex < files.size(); fileIndex++) {
+        const std::string& relativePath = relativePaths[fileIndex];
+        for (auto& outcome : outcomes[fileIndex]) {
+            if (const auto earlier = suppliedBy.find(outcome.target); earlier != suppliedBy.end()) {
+                SPDLOG_DEBUG("Skipping {} for {}: {} comes first", relativePath, outcome.target, earlier->second);
+                continue;
+            }
+            for (const auto& [level, message] : outcome.logs) {
+                spdlog::log(level, message);
+            }
+            if (!outcome.entry) {
+                continue;
+            }
+            suppliedBy[outcome.target] = relativePath;
+            const std::string key = Paths::Dirname(*outcome.entry->targetName);
+            processed[key].emplace_back(files[fileIndex], std::move(*outcome.entry));
         }
     }
     return processed;

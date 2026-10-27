@@ -2,10 +2,30 @@
 #include "build.h"
 #include "utils/Log.h"
 
+#include <cstdlib>
+#include <filesystem>
 #include <spdlog/spdlog.h>
 #include <string>
 
+namespace {
+void EnterShipHome() {
+    const char* home = std::getenv("SHIP_HOME");
+    if (home == nullptr || home[0] == '\0') {
+        return;
+    }
+    std::string path = home;
+    if (path[0] == '~') {
+        const char* user = std::getenv("HOME");
+        path = std::string(user != nullptr ? user : "") + path.substr(1);
+    }
+    std::error_code ec;
+    std::filesystem::create_directories(path, ec);
+    std::filesystem::current_path(path, ec);
+}
+} // namespace
+
 int main(int argc, char* argv[]) {
+    EnterShipHome();
     Log::Init();
     SPDLOG_INFO("neoretro {} [{}@{}]", gBuildVersion, gGitBranch, gGitCommitHash);
 

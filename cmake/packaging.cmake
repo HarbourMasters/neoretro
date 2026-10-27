@@ -43,9 +43,13 @@ set(CPACK_DEB_COMPONENT_INSTALL YES)
 set(CPACK_EXTERNAL_ENABLE_STAGING YES)
 set(CPACK_EXTERNAL_PACKAGE_SCRIPT "${PROJECT_BINARY_DIR}/appimage-generate.cmake")
 
-file(GENERATE
-  OUTPUT "${PROJECT_BINARY_DIR}/appimage-generate.cmake"
-  CONTENT [[
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+  set(LINUXDEPLOY_ARCH aarch64)
+else()
+  set(LINUXDEPLOY_ARCH x86_64)
+endif()
+
+set(APPIMAGE_GENERATE_SCRIPT [[
 include(CMakePrintHelpers)
 cmake_print_variables(CPACK_TEMPORARY_DIRECTORY)
 cmake_print_variables(CPACK_TOPLEVEL_DIRECTORY)
@@ -53,14 +57,14 @@ cmake_print_variables(CPACK_PACKAGE_DIRECTORY)
 cmake_print_variables(CPACK_PACKAGE_FILE_NAME)
 
 find_program(LINUXDEPLOY_EXECUTABLE
-  NAMES linuxdeploy linuxdeploy-x86_64.AppImage
+  NAMES linuxdeploy linuxdeploy-@LINUXDEPLOY_ARCH@.AppImage
   PATHS ${CPACK_PACKAGE_DIRECTORY}/linuxdeploy)
 
 if (NOT LINUXDEPLOY_EXECUTABLE)
   message(STATUS "Downloading linuxdeploy")
   set(LINUXDEPLOY_EXECUTABLE ${CPACK_PACKAGE_DIRECTORY}/linuxdeploy/linuxdeploy)
   file(DOWNLOAD 
-      https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20240109-1/linuxdeploy-x86_64.AppImage
+      https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20240109-1/linuxdeploy-@LINUXDEPLOY_ARCH@.AppImage
       ${LINUXDEPLOY_EXECUTABLE}
       INACTIVITY_TIMEOUT 10
       LOG ${CPACK_PACKAGE_DIRECTORY}/linuxdeploy/download.log
@@ -84,6 +88,11 @@ execute_process(
     --verbosity=2
 )
 ]])
+string(CONFIGURE "${APPIMAGE_GENERATE_SCRIPT}" APPIMAGE_GENERATE_SCRIPT @ONLY)
+
+file(GENERATE
+  OUTPUT "${PROJECT_BINARY_DIR}/appimage-generate.cmake"
+  CONTENT "${APPIMAGE_GENERATE_SCRIPT}")
 
 endif()
 

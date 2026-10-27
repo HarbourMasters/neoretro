@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 
+set(NEORETRO_VERSION "0.1.0" CACHE STRING "neoretro version (major.minor.patch)")
+
 # Set the project version and language
-project(neoretro VERSION 0.1.0 LANGUAGES C CXX)
+project(neoretro VERSION ${NEORETRO_VERSION} LANGUAGES C CXX)
 include(FetchContent)
 
 set(NATO_PHONETIC_ALPHABET
@@ -12,7 +14,7 @@ set(NATO_PHONETIC_ALPHABET
 )
 
 # Get the patch version number from the project version
-math(EXPR PATCH_INDEX "${PROJECT_VERSION_PATCH}")
+math(EXPR PATCH_INDEX "${PROJECT_VERSION_PATCH} % 26")
 
 # Use the patch number to select the correct word
 list(GET NATO_PHONETIC_ALPHABET ${PATCH_INDEX} PROJECT_PATCH_WORD)
@@ -71,8 +73,15 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/modules/")
 
 if (WIN32)
 include(cmake/automate-vcpkg.cmake)
-set(VCPKG_TRIPLET x64-windows-static)
-set(VCPKG_TARGET_TRIPLET x64-windows-static)
+if (CMAKE_CXX_COMPILER_ARCHITECTURE_ID MATCHES "ARM64" OR CMAKE_GENERATOR_PLATFORM MATCHES "ARM64")
+    set(NEORETRO_WINDOWS_ARCH "ARM64")
+    set(VCPKG_TRIPLET arm64-windows-static)
+    set(VCPKG_TARGET_TRIPLET arm64-windows-static)
+else()
+    set(NEORETRO_WINDOWS_ARCH "x64")
+    set(VCPKG_TRIPLET x64-windows-static)
+    set(VCPKG_TARGET_TRIPLET x64-windows-static)
+endif()
 vcpkg_bootstrap()
 vcpkg_install_packages(curl)
 
@@ -88,11 +97,12 @@ endif()
 ################################################################################
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     if(NOT CMAKE_VS_PLATFORM_NAME)
-        set(CMAKE_VS_PLATFORM_NAME "x64")
+        set(CMAKE_VS_PLATFORM_NAME "${NEORETRO_WINDOWS_ARCH}")
     endif()
     message("${CMAKE_VS_PLATFORM_NAME} architecture in use")
 
     if(NOT ("${CMAKE_VS_PLATFORM_NAME}" STREQUAL "x64"
+        OR "${CMAKE_VS_PLATFORM_NAME}" STREQUAL "ARM64"
         OR "${CMAKE_VS_PLATFORM_NAME}" STREQUAL "Win32"))
         message(FATAL_ERROR "${CMAKE_VS_PLATFORM_NAME} arch is not supported!")
     endif()
@@ -440,9 +450,32 @@ add_custom_command(
 if(CMAKE_SYSTEM_NAME MATCHES "Windows")
     install(TARGETS ${PROJECT_NAME} DESTINATION . COMPONENT ${PROJECT_NAME})
     install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/ DESTINATION assets COMPONENT ${PROJECT_NAME})
+    install(FILES $<TARGET_PDB_FILE:${PROJECT_NAME}> DESTINATION ./debug COMPONENT ${PROJECT_NAME} OPTIONAL)
 elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    add_custom_target(CreateOSXIcons
+        COMMAND mkdir -p ${CMAKE_BINARY_DIR}/macosx/neoretro.iconset
+        COMMAND sips -z 16 16     logo.png --out ${CMAKE_BINARY_DIR}/macosx/neoretro.iconset/icon_16x16.png
+        COMMAND sips -z 32 32     logo.png --out ${CMAKE_BINARY_DIR}/macosx/neoretro.iconset/icon_16x16@2x.png
+        COMMAND sips -z 32 32     logo.png --out ${CMAKE_BINARY_DIR}/macosx/neoretro.iconset/icon_32x32.png
+        COMMAND sips -z 64 64     logo.png --out ${CMAKE_BINARY_DIR}/macosx/neoretro.iconset/icon_32x32@2x.png
+        COMMAND sips -z 128 128   logo.png --out ${CMAKE_BINARY_DIR}/macosx/neoretro.iconset/icon_128x128.png
+        COMMAND sips -z 256 256   logo.png --out ${CMAKE_BINARY_DIR}/macosx/neoretro.iconset/icon_128x128@2x.png
+        COMMAND sips -z 256 256   logo.png --out ${CMAKE_BINARY_DIR}/macosx/neoretro.iconset/icon_256x256.png
+        COMMAND sips -z 512 512   logo.png --out ${CMAKE_BINARY_DIR}/macosx/neoretro.iconset/icon_256x256@2x.png
+        COMMAND sips -z 512 512   logo.png --out ${CMAKE_BINARY_DIR}/macosx/neoretro.iconset/icon_512x512.png
+        COMMAND cp                logo.png ${CMAKE_BINARY_DIR}/macosx/neoretro.iconset/icon_512x512@2x.png
+        COMMAND iconutil -c icns -o ${CMAKE_BINARY_DIR}/macosx/neoretro.icns ${CMAKE_BINARY_DIR}/macosx/neoretro.iconset
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Creating OSX icons ..."
+    )
+    add_dependencies(${PROJECT_NAME} CreateOSXIcons)
+    configure_file("${CMAKE_SOURCE_DIR}/Info.plist" "${CMAKE_BINARY_DIR}/Info.plist" @ONLY)
     install(TARGETS ${PROJECT_NAME} DESTINATION ../MacOS COMPONENT ${PROJECT_NAME})
     install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/ DESTINATION ../Resources/assets COMPONENT ${PROJECT_NAME})
+    install(CODE "
+        include(BundleUtilities)
+        fixup_bundle(\"\${CMAKE_INSTALL_PREFIX}/../MacOS/${PROJECT_NAME}\" \"\" \"\")
+    " COMPONENT ${PROJECT_NAME})
 elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
     install(TARGETS ${PROJECT_NAME} DESTINATION . COMPONENT ${PROJECT_NAME})
     install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/ DESTINATION assets COMPONENT ${PROJECT_NAME})
@@ -459,5 +492,6 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
     set(CPACK_GENERATOR "Bundle")
 endif()
 
+set(CPACK_INSTALL_CMAKE_PROJECTS "${CMAKE_BINARY_DIR};${PROJECT_NAME};${PROJECT_NAME};/")
 set(CPACK_PROJECT_CONFIG_FILE ${CMAKE_SOURCE_DIR}/cmake/configure-packaging.cmake)
 include(cmake/packaging.cmake)

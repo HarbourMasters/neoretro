@@ -10,6 +10,7 @@ namespace {
 const std::regex kColorVariantPattern(R"(^(.+_\d+_\d+)_(BLUE|GREEN|ORANGE|PURPLE|YELLOW)$)");
 const std::regex kBoldFontPattern(R"(^(.*)boldfont/(.+_\d+_\d+)_[0-9A-Fa-f]+$)");
 const std::regex kLangScopedPattern(R"(^(.*)lang/[^/]+/(.+)$)");
+const std::regex kAnimFramePattern(R"(^(.+_tex_\d+)_frame_\d+$)");
 const std::regex kSpriteChunkPattern(R"(^(.+)_(\d+)_(\d+)$)");
 
 std::optional<TextureManifestEntry> Lookup(const nlohmann::json& manifest, const std::string& key) {
@@ -55,6 +56,11 @@ std::optional<TextureManifestEntry> Bk64TextureConventions::ResolveAdditiveEntry
     }
     if (std::regex_match(target, match, kLangScopedPattern)) {
         if (auto tmpl = Lookup(manifest, match[1].str() + match[2].str())) {
+            return AdditiveFrom(*tmpl, TextureEntryKind::Additive);
+        }
+    }
+    if (std::regex_match(target, match, kAnimFramePattern)) {
+        if (auto tmpl = Lookup(manifest, match[1].str())) {
             return AdditiveFrom(*tmpl, TextureEntryKind::Additive);
         }
     }

@@ -1,0 +1,69 @@
+name: Windows Validation
+
+on:
+  pull_request:
+    branches: [ "*" ]
+
+jobs:
+  build:
+    name: Windows (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-2022
+          - arch: arm64
+            runner: windows-11-arm
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
+      - name: Cache dependencies
+        uses: actions/cache@v6
+        with:
+          key: windows-${{ matrix.arch }}-deps-${{ hashFiles('CMakeLists.txt', 'cmake/**') }}
+          path: build/${{ matrix.arch }}/_deps
+      - name: Cache vcpkg binaries
+        uses: actions/cache@v6
+        with:
+          key: windows-validation-${{ matrix.arch }}-vcpkg-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            windows-validation-${{ matrix.arch }}-vcpkg-${{ github.ref }}
+            windows-validation-${{ matrix.arch }}-vcpkg-
+            windows-${{ matrix.arch }}-vcpkg-
+          path: |
+            ~\AppData\Local\vcpkg\archives
+      - name: sccache
+        uses: hendrikmuhs/ccache-action@v1.2.14
+        with:
+          variant: sccache
+          max-size: 2G
+          save: ${{ github.ref_name == github.event.repository.default_branch }}
+          key: windows-validation-${{ matrix.arch }}-sccache-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            windows-validation-${{ matrix.arch }}-sccache-${{ github.ref }}
+            windows-validation-${{ matrix.arch }}-sccache-
+      - name: Build
+        run: |
+          if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT }
+          cmake -S . -B "build/${{ matrix.arch }}" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+          cmake --build ./build/${{ matrix.arch }} --parallel 10
+      - name: Test
+        run: ./build/${{ matrix.arch }}/neoretro-tests.exe
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: neoretro-windows-${{ matrix.arch }}
+          path: |
+            build/${{ matrix.arch }}/neoretro.exe
+            build/${{ matrix.arch }}/assets
+          retention-days: 1

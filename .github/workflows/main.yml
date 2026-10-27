@@ -1,0 +1,198 @@
+name: GenerateBuilds
+
+on:
+  push:
+    branches: [ "**" ]
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        default: ""
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows:
+    name: Windows (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-2022
+          - arch: arm64
+            runner: windows-11-arm
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
+      - name: Cache dependencies
+        uses: actions/cache@v6
+        with:
+          key: windows-${{ matrix.arch }}-deps-${{ hashFiles('CMakeLists.txt', 'cmake/**') }}
+          path: build/${{ matrix.arch }}/_deps
+      - name: Cache vcpkg binaries
+        uses: actions/cache@v6
+        with:
+          key: windows-${{ matrix.arch }}-vcpkg-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            windows-${{ matrix.arch }}-vcpkg-${{ github.ref }}
+            windows-${{ matrix.arch }}-vcpkg-
+          path: |
+            ~\AppData\Local\vcpkg\archives
+      - name: sccache
+        uses: hendrikmuhs/ccache-action@v1.2.14
+        with:
+          variant: sccache
+          max-size: 2G
+          save: ${{ github.ref_name == github.event.repository.default_branch }}
+          key: windows-${{ matrix.arch }}-sccache-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            windows-${{ matrix.arch }}-sccache-${{ github.ref }}
+            windows-${{ matrix.arch }}-sccache-
+      - name: Build
+        run: |
+          if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT }
+          cmake -S . -B "build/${{ matrix.arch }}" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache ${{ inputs.version && format('-DNEORETRO_VERSION={0}', inputs.version) || '' }}
+          cmake --build ./build/${{ matrix.arch }} --parallel 10
+      - name: Test
+        run: ./build/${{ matrix.arch }}/neoretro-tests.exe
+      - name: Create Package
+        shell: pwsh
+        run: |
+          mkdir neoretro-release
+          mkdir neoretro-release/debug
+          Move-Item build/${{ matrix.arch }}/neoretro.exe neoretro-release/
+          Copy-Item -Recurse build/${{ matrix.arch }}/assets neoretro-release/assets
+          Get-ChildItem build/${{ matrix.arch }} -Filter *.dll | Move-Item -Destination neoretro-release/
+          Get-ChildItem build/${{ matrix.arch }} -Filter neoretro.pdb | Move-Item -Destination neoretro-release/debug/
+          Copy-Item README.md neoretro-release/readme.txt
+          Copy-Item LICENSE.md neoretro-release/license.txt
+      - name: Sign binaries
+        if: ${{ env.WINDOWS_CERT_PFX_BASE64 != '' }}
+        env:
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        shell: pwsh
+        run: |
+          $pfx = "$env:RUNNER_TEMP\codesign.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERT_PFX_BASE64))
+          $signtool = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1).FullName
+          Get-ChildItem -Path neoretro-release/neoretro.exe, neoretro-release/*.dll -ErrorAction SilentlyContinue | ForEach-Object {
+            & $signtool sign /f $pfx /p $env:WINDOWS_CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $_.FullName
+            if ($LASTEXITCODE -ne 0) { throw "signtool failed for $($_.FullName)" }
+          }
+          Remove-Item $pfx -Force
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: neoretro-windows-${{ matrix.arch }}
+          path: neoretro-release
+
+  build-macos:
+    name: macOS (universal)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Install dependencies
+        run: brew install ninja
+      - name: Cache dependencies
+        uses: actions/cache@v6
+        with:
+          key: mac-universal-deps-${{ hashFiles('CMakeLists.txt', 'cmake/**') }}
+          path: build-cmake/_deps
+      - name: Configure ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          max-size: 2G
+          save: ${{ github.ref_name == github.event.repository.default_branch }}
+          key: ${{ runner.os }}-universal-ccache-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-universal-ccache-${{ github.ref }}
+            ${{ runner.os }}-universal-ccache
+      - name: Build (Universal)
+        run: |
+          cmake --no-warn-unused-cli -H. -Bbuild-cmake -GNinja -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache ${{ inputs.version && format('-DNEORETRO_VERSION={0}', inputs.version) || '' }}
+          cmake --build build-cmake --config Release --parallel 10
+      - name: Test
+        run: |
+          lipo -info build-cmake/neoretro
+          ./build-cmake/neoretro-tests
+          if arch -x86_64 /usr/bin/true 2>/dev/null; then arch -x86_64 ./build-cmake/neoretro-tests; fi
+      - name: Create Package
+        run: |
+          (cd build-cmake && cpack)
+          mv _packages/*.dmg neoretro.dmg
+          cp README.md readme.txt
+      - name: Publish packaged artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: neoretro-mac-universal
+          path: |
+            neoretro.dmg
+            readme.txt
+
+  build-linux:
+    name: Linux (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Update machine
+        run: sudo apt update
+      - name: Install dependencies
+        run: sudo apt-get install -y gcc g++ git cmake ninja-build lsb-release file libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev libwayland-dev libxkbcommon-dev wayland-protocols libgtk-3-dev libcurl4-openssl-dev
+      - name: Cache dependencies
+        uses: actions/cache@v6
+        with:
+          key: linux-${{ matrix.arch }}-deps-${{ hashFiles('CMakeLists.txt', 'cmake/**') }}
+          path: build-cmake/_deps
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2.14
+        with:
+          max-size: 2G
+          save: ${{ github.ref_name == github.event.repository.default_branch }}
+          key: linux-${{ matrix.arch }}-ccache-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            linux-${{ matrix.arch }}-ccache-${{ github.ref }}
+            linux-${{ matrix.arch }}-ccache-
+      - name: Build
+        run: |
+          cmake -H. -Bbuild-cmake -GNinja -DCMAKE_BUILD_TYPE=Release -D CMAKE_C_COMPILER_LAUNCHER=ccache -D CMAKE_CXX_COMPILER_LAUNCHER=ccache ${{ inputs.version && format('-DNEORETRO_VERSION={0}', inputs.version) || '' }}
+          cmake --build build-cmake --config Release -j4
+      - name: Test
+        run: ./build-cmake/neoretro-tests
+      - name: Create Package
+        run: |
+          (cd build-cmake && cpack -G External)
+          mv build-cmake/*.appimage neoretro.appimage
+          cp README.md readme.txt
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: neoretro-linux-${{ matrix.arch }}
+          path: |
+            neoretro.appimage
+            readme.txt

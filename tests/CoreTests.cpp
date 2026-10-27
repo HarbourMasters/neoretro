@@ -300,6 +300,13 @@ void TestBk64Conventions() {
     const auto bold = bk.ResolveAdditiveEntry(manifest, "boldfont/foo_1_2_A0");
     CHECK(bold && bold->kind == TextureEntryKind::AdditiveFontGlyph);
     CHECK(!bk.ResolveAdditiveEntry(manifest, "sprite/unknown"));
+    const nlohmann::json frames = {
+        { "anim/door_tex_2",
+          { { "hash", "x" }, { "textureType", 1 }, { "textureWidth", 32 }, { "textureHeight", 32 } } },
+    };
+    const auto frame = bk.ResolveAdditiveEntry(frames, "anim/door_tex_2_frame_5");
+    CHECK(frame && frame->kind == TextureEntryKind::Additive && frame->textureWidth == 32);
+    CHECK(!bk.ResolveAdditiveEntry(frames, "anim/door_tex_2_frame_"));
     CHECK(TextureReplacement::BandIndexOf("bg/sky#2") == 2);
     CHECK(!TextureReplacement::BandIndexOf("bg/sky#"));
     CHECK(!TextureReplacement::BandIndexOf("bg/sky"));
@@ -403,6 +410,61 @@ void TestFontGenerator() {
     CHECK(lit > 1000);
 }
 
+void TestGlidenOrderAndAliases() {
+    const fs::path dir = TempDir("gliden");
+    for (const char* file : { "b/z.png", "a.png", "b/Y.png", ".hidden/h.png", "~!~skip/s.png", "C.png" }) {
+        Paths::WriteFile(dir / file, { 1 });
+    }
+    std::vector<std::string> order;
+    for (const auto& file : TextureReplacement::ListInGlidenOrder(dir)) {
+        order.push_back(Paths::Relative(file, dir));
+    }
+    CHECK((order == std::vector<std::string>{ "a.png", "b/Y.png", "b/z.png", "C.png" }));
+
+    const fs::path pack = TempDir("aliases");
+    const Image image = Gradient(8, 8);
+    const auto png = ImageIO::EncodePng(image);
+    nlohmann::json manifest;
+    for (const char* name : { "tex/one", "tex/two", "sprite/foo_tex_3" }) {
+        auto entry = Entry(Otr::TextureType::RGBA32bpp, 8, 8);
+        entry.hash = "stale";
+        manifest[name] = entry.ToJson();
+    }
+    Paths::WriteText(pack / "manifest.json", manifest.dump());
+    Paths::WriteText(pack / "aliases.json", R"({ "one.png": "tex/one", "old/moved.png": "tex/two" })");
+    Paths::WriteFile(pack / "b/one.png", png);
+    Paths::WriteFile(pack / "a/one.png", png);
+    Paths::WriteFile(pack / "new/moved.png", png);
+    Paths::WriteFile(pack / "sprite/foo_tex_3_frame_2.png", png);
+
+    const auto staged = TextureReplacement::ProcessFolder(pack);
+    CHECK(staged.has_value());
+    if (!staged) {
+        return;
+    }
+    const auto find = [&](const std::string& target) -> const TexturePair* {
+        for (const auto& [key, pairs] : *staged) {
+            for (const auto& pair : pairs) {
+                if (pair.second.targetName == target) {
+                    return &pair;
+                }
+            }
+        }
+        return nullptr;
+    };
+    const auto* one = find("tex/one");
+    const auto* two = find("tex/two");
+    const auto* frame = find("sprite/foo_tex_3_frame_2");
+    CHECK(one && Paths::Relative(one->first, pack) == "a/one.png");
+    CHECK(two && Paths::Relative(two->first, pack) == "new/moved.png");
+    CHECK(frame && frame->second.kind == TextureEntryKind::Additive);
+    size_t total = 0;
+    for (const auto& [key, pairs] : *staged) {
+        total += pairs.size();
+    }
+    CHECK(total == 3);
+}
+
 void TestThreadPool() {
     ThreadPool pool(4);
     std::vector<int> values(10000, 0);
@@ -495,6 +557,7 @@ int main() {
         { "replace textures flow", TestReplaceTexturesFlow },
         { "generate custom and sequences", TestGenerateCustomAndSequences },
         { "font generator", TestFontGenerator },
+        { "gliden order and aliases", TestGlidenOrderAndAliases },
         { "thread pool", TestThreadPool },
         { "real archive", TestRealArchive },
     };
