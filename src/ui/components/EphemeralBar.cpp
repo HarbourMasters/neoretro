@@ -151,6 +151,48 @@ void EphemeralBar::FinishPanel(AppContext& ctx) {
         }
     };
 
+    const ClayUi::WidgetFn drawList = [this](ImVec2 min, ImVec2 max) {
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(0, 0, 0, 0));
+        ImGui::BeginChild("##FinishList", max - min);
+        constexpr float rowHeight = 20.0f;
+        ImGuiListClipper clipper;
+        clipper.Begin((int)mRows.size(), rowHeight);
+        while (clipper.Step()) {
+            for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
+                const Row& row = mRows[i];
+                const ImVec2 start = ImGui::GetCursorScreenPos();
+                const float width = ImGui::GetContentRegionAvail().x;
+                if (row.header) {
+                    ImGui::PushFont(Theme::GetFont(FONT_MEDIUM), (float)TextSize::TitleSmall);
+                    ImGui::TextUnformatted(row.text.c_str());
+                    ImGui::PopFont();
+                } else {
+                    ImGui::PushFont(Theme::GetFont(FONT_REGULAR), (float)TextSize::BodyMedium);
+                    const ImVec2 textMax(start.x + width - 40.0f, start.y + rowHeight);
+                    ImGui::RenderTextEllipsis(ImGui::GetWindowDrawList(), start, textMax, textMax.x, row.text.c_str(),
+                                              nullptr, nullptr);
+                    ImGui::PopFont();
+                    ImGui::SetCursorScreenPos(ImVec2(start.x + width - 40.0f, start.y));
+                    ImGui::PushID(i);
+                    ImGui::PushFont(Theme::GetFont(FONT_ICONS), 20.0f);
+                    ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
+                    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+                    if (ImGui::Button(Icons::Delete, ImVec2(20, 20))) {
+                        mPendingRemove = std::make_pair(row.file, row.key);
+                    }
+                    ImGui::PopStyleVar();
+                    ImGui::PopStyleColor();
+                    ImGui::PopFont();
+                    ImGui::PopID();
+                }
+                ImGui::SetCursorScreenPos(ImVec2(start.x, start.y + rowHeight));
+                ImGui::Dummy(ImVec2(0, 0));
+            }
+        }
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
+    };
+
     CustomScaffold(ui, options, [&] {
         CLAY({ .id = CLAY_ID("Finish_Body"),
                .layout = { .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
@@ -159,47 +201,7 @@ void EphemeralBar::FinishPanel(AppContext& ctx) {
                            .layoutDirection = CLAY_TOP_TO_BOTTOM } }) {
             CLAY({ .id = CLAY_ID("Finish_List"),
                    .layout = { .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) } },
-                   .custom = ui.Widget([this](ImVec2 min, ImVec2 max) {
-                       ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(0, 0, 0, 0));
-                       ImGui::BeginChild("##FinishList", max - min);
-                       constexpr float rowHeight = 20.0f;
-                       ImGuiListClipper clipper;
-                       clipper.Begin((int)mRows.size(), rowHeight);
-                       while (clipper.Step()) {
-                           for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
-                               const Row& row = mRows[i];
-                               const ImVec2 start = ImGui::GetCursorScreenPos();
-                               const float width = ImGui::GetContentRegionAvail().x;
-                               if (row.header) {
-                                   ImGui::PushFont(Theme::GetFont(FONT_MEDIUM), (float)TextSize::TitleSmall);
-                                   ImGui::TextUnformatted(row.text.c_str());
-                                   ImGui::PopFont();
-                               } else {
-                                   ImGui::PushFont(Theme::GetFont(FONT_REGULAR), (float)TextSize::BodyMedium);
-                                   const ImVec2 textMax(start.x + width - 40.0f, start.y + rowHeight);
-                                   ImGui::RenderTextEllipsis(ImGui::GetWindowDrawList(), start, textMax, textMax.x,
-                                                             row.text.c_str(), nullptr, nullptr);
-                                   ImGui::PopFont();
-                                   ImGui::SetCursorScreenPos(ImVec2(start.x + width - 40.0f, start.y));
-                                   ImGui::PushID(i);
-                                   ImGui::PushFont(Theme::GetFont(FONT_ICONS), 20.0f);
-                                   ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
-                                   ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-                                   if (ImGui::Button(Icons::Delete, ImVec2(20, 20))) {
-                                       mPendingRemove = std::make_pair(row.file, row.key);
-                                   }
-                                   ImGui::PopStyleVar();
-                                   ImGui::PopStyleColor();
-                                   ImGui::PopFont();
-                                   ImGui::PopID();
-                               }
-                               ImGui::SetCursorScreenPos(ImVec2(start.x, start.y + rowHeight));
-                               ImGui::Dummy(ImVec2(0, 0));
-                           }
-                       }
-                       ImGui::EndChild();
-                       ImGui::PopStyleColor();
-                   }) }) {
+                   .custom = ui.Widget(drawList) }) {
             }
 
             Widgets::Gap(0, 20);
