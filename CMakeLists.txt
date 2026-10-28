@@ -414,8 +414,10 @@ if(MSVC)
         >
         /MANIFEST:NO;
         /DEBUG;
-        /SUBSYSTEM:WINDOWS
+        /SUBSYSTEM:WINDOWS;
+        /ENTRY:mainCRTStartup
     )
+    target_compile_definitions(${PROJECT_NAME}-core PUBLIC YAML_CPP_STATIC_DEFINE)
 endif()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
