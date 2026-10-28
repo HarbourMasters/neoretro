@@ -19,7 +19,7 @@ void GameSelectionScreen::Layout(AppContext& ctx) {
     options.onBackButtonPressed = [&] { ctx.router.Pop(); };
 
     CustomScaffold(ui, options, [&] {
-        CenteredCards(ui, "GameSelection_Cards", 15, [&] {
+        const auto shipRow = [&] {
             if (OptionCard(ui, "GameSelection_Soh", Tr("gameSelectionScreenSoh_title"), Icons::DirectionsBoatFilled)) {
                 ctx.router.Push("/game_selection/soh");
             }
@@ -30,7 +30,13 @@ void GameSelectionScreen::Layout(AppContext& ctx) {
                 ctx.toasts.Post({ Tr("gameSelection2ShipComingSoon_text"), RetroColors::Cream, RetroColors::Black,
                                   Icons::Favorite, RetroColors::Red, 4.0f });
             }
-        });
+        };
+        const auto paperboatRow = [&] {
+            if (OptionCard(ui, "GameSelection_Paperboat", Tr("gameSelectionScreenPaperboat_title"), Icons::Sailing)) {
+                ctx.router.Push("/game_selection/paperboat");
+            }
+        };
+        CenteredCardRows(ui, "GameSelection_Cards", 15, { shipRow, paperboatRow });
     });
 }
 
@@ -70,6 +76,22 @@ void GhostshipGameScreen::Layout(AppContext& ctx) {
             }
             if (OptionCard(ui, "GhostshipGame_Strings", Tr("ghostshipTextScreen_strings"), Icons::Translate)) {
                 ctx.router.Push("/game_selection/ghostship/strings");
+            }
+        });
+    });
+}
+
+void PaperboatGameScreen::Layout(AppContext& ctx) {
+    auto& ui = ctx.ui;
+    ScaffoldOptions options;
+    options.title = Tr("gameSelectionScreenPaperboat_title");
+    options.subtitle = Tr("gameSelectionScreenPaperboat_subtitle");
+    options.onBackButtonPressed = [&] { ctx.router.Pop(); };
+
+    CustomScaffold(ui, options, [&] {
+        CenteredCards(ui, "PaperboatGame_Cards", 15, [&] {
+            if (OptionCard(ui, "PaperboatGame_Strings", Tr("paperboatTextScreen_strings"), Icons::Translate)) {
+                ctx.router.Push("/game_selection/paperboat/strings");
             }
         });
     });

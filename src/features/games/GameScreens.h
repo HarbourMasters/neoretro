@@ -17,6 +17,11 @@ class GhostshipGameScreen : public Screen {
     void Layout(AppContext& ctx) override;
 };
 
+class PaperboatGameScreen : public Screen {
+  public:
+    void Layout(AppContext& ctx) override;
+};
+
 class Ship2GameScreen : public Screen {
   public:
     void Layout(AppContext& ctx) override;

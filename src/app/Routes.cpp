@@ -9,6 +9,7 @@
 #include "features/debug/DebugSelectionScreen.h"
 #include "features/games/GameScreens.h"
 #include "features/games/ghostship/GhostshipTextScreen.h"
+#include "features/games/paperboat/PaperboatTextScreen.h"
 #include "features/home/HomeScreen.h"
 #include "features/inspect_otr/InspectOtrScreen.h"
 
@@ -30,6 +31,8 @@ void RegisterRoutes(Router& router) {
     ghostshipText("/game_selection/ghostship/dialogs", GhostshipTextKind::Dialogs);
     ghostshipText("/game_selection/ghostship/texts", GhostshipTextKind::Texts);
     ghostshipText("/game_selection/ghostship/strings", GhostshipTextKind::Strings);
+    route.operator()<PaperboatGameScreen>("/game_selection/paperboat");
+    route.operator()<PaperboatTextScreen>("/game_selection/paperboat/strings");
     route.operator()<CreateCustomScreen>("/create_custom");
     route.operator()<InspectOtrScreen>("/view_otr");
     route.operator()<CreateCustomSequencesScreen>("/create_custom_sequences");

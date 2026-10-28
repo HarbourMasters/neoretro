@@ -1,4 +1,5 @@
 #include "games/bk64/Bk64Conventions.h"
+#include "games/pm64/Pm64Text.h"
 #include "games/sm64/Sm64Text.h"
 #include "image/Image.h"
 #include "otr/Archive.h"
@@ -510,6 +511,90 @@ void TestUpdateFeed() {
     CHECK(std::string(UpdateFeed::PlatformKey()).find('-') != std::string::npos);
 }
 
+void TestPm64Text() {
+    const std::vector<uint8_t> hello = { 0xFC, 0x01, 0x28, 0x49, 0x0C, 0xF7, 0xFF, 0x05, 0x0A, 0x41, 0x98,
+                                         0xF7, 0xFF, 0x24, 0xFF, 0x05, 0x10, 0x98, 0xFF, 0x25, 0x01, 0xF0,
+                                         0x3B, 0xFB, 0xF2, 0x1E, 0xFF, 0x00, 0x01, 0xFE, 0xFD };
+    const std::string decoded = Pm64::DecodeText(hello);
+    CHECK(decoded == "[Style right]\nHi, [Color 0x0A]a[~A] [A]!\n\\[[Next]\n[Pause 30][Font menu]\n[Raw 0xFE]");
+    CHECK(Pm64::EncodeText(decoded) == hello);
+    CHECK(Pm64::EncodeText("[style choice pos=1,2 size=0x10,4]x\r\ny") ==
+          (std::vector<uint8_t>{ 0xFC, 0x05, 1, 2, 0x10, 4, 0x58, 0xF0, 0x59, 0xFD }));
+    CHECK(Pm64::EncodeText("[ItemIcon 0x0123][SetPosX 300]") ==
+          (std::vector<uint8_t>{ 0xFF, 0x17, 0x01, 0x23, 0xFF, 0x10, 0x01, 0x2C, 0xFD }));
+    CHECK(Pm64::DecodeText({ 0xFB, 0xF0, 0xFD }) == "[Next]\n\n");
+    CHECK(Pm64::EncodeText("[Next]\n\n") == (std::vector<uint8_t>{ 0xFB, 0xF0, 0xFD }));
+    CHECK(Pm64::DecodeText({ 0xFF, 0x05 }) == "[Func 0x05]");
+    CHECK(Pm64::DecodeText({ 0xFF }) == "[Raw 0xFF]");
+    std::string error;
+    CHECK(!Pm64::EncodeText("bad [", Pm64::Charset::Standard, &error) && error.find("Unclosed") != std::string::npos);
+    CHECK(!Pm64::EncodeText("[Bogus 1]", Pm64::Charset::Standard, &error) && error.find("Bogus") != std::string::npos);
+    CHECK(!Pm64::EncodeText("[Pause 256]", Pm64::Charset::Standard, &error));
+    CHECK(Pm64::EncodeText("[Pause 010][Pause 08]") == (std::vector<uint8_t>{ 0xF2, 10, 0xF2, 8, 0xFD }));
+    CHECK(!Pm64::EncodeText("[Pause 0x]") && !Pm64::EncodeText("[Pause +5]") && !Pm64::EncodeText("[Pause -1]"));
+    CHECK(!Pm64::EncodeText("\xe2\x98\x85", Pm64::Charset::Standard, &error));
+
+    CHECK(Pm64::CharsetFor("messages/MSG_Credits_0001") == Pm64::Charset::Credits);
+    CHECK(Pm64::CharsetFor("messages/MSG_Intro_0001") == Pm64::Charset::Standard);
+    CHECK(Pm64::EncodeText("MARIO \xc2\xa9 1", Pm64::Charset::Credits) ==
+          (std::vector<uint8_t>{ 0x0C, 0x00, 0x11, 0x08, 0x0E, 0xF7, 0x27, 0xF7, 0x1E, 0xFD }));
+    CHECK(!Pm64::EncodeText("mario", Pm64::Charset::Credits));
+
+    const auto data = Pm64::ExportMessage(hello, "messages/MSG_Test_0001");
+    const std::vector<uint8_t> resource(data.begin(), data.end());
+    const auto header = Otr::ReadHeader(resource);
+    CHECK(header && header->type == (uint32_t)Otr::ResourceType::Blob);
+    CHECK(resource.size() == 64 + 4 + 32);
+    CHECK(Pm64::ParseMessage(resource) == hello);
+    const std::vector<uint8_t> terminatorArg = { 0xF2, 0xFD, 0x28, 0x49, 0xFD };
+    CHECK(Pm64::DecodeText(terminatorArg) == "[Pause 253]Hi");
+    const auto terminatorData = Pm64::ExportMessage(terminatorArg, "messages/MSG_Test_0002");
+    CHECK(Pm64::ParseMessage(std::vector<uint8_t>(terminatorData.begin(), terminatorData.end())) == terminatorArg);
+
+    const fs::path dir = TempDir("pm64");
+    std::map<std::string, StageEntry> stage;
+    stage["messages"] = ResourceDataEntry{ { { "MSG_Test_0001", data } } };
+    const std::string output = (dir / "text.o2r").string();
+    std::atomic<int> processed = 0;
+    CHECK(OtrGenerator::Generate(stage, output, true, processed, [](const std::string&) {}));
+    CHECK(processed == 1);
+    auto reader = Otr::ArchiveReader::Open(output);
+    const auto messages = reader ? Pm64::LoadMessages(*reader) : Pm64::Messages{};
+    CHECK(messages.size() == 1 && messages.count("messages/MSG_Test_0001") &&
+          messages.at("messages/MSG_Test_0001") == hello);
+}
+
+void TestRealPm64Archive() {
+    const char* path = std::getenv("NEORETRO_TEST_PM64_ARCHIVE");
+    if (path == nullptr) {
+        std::printf("  (skipped: set NEORETRO_TEST_PM64_ARCHIVE)\n");
+        return;
+    }
+    auto reader = Otr::ArchiveReader::Open(path);
+    CHECK(reader != nullptr);
+    if (!reader) {
+        return;
+    }
+    const auto start = std::chrono::steady_clock::now();
+    const auto messages = Pm64::LoadMessages(*reader);
+    const auto seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    size_t mismatches = 0;
+    size_t raw = 0;
+    for (const auto& [name, bytes] : messages) {
+        const auto charset = Pm64::CharsetFor(name);
+        const std::string text = Pm64::DecodeText(bytes, charset);
+        raw += text.find("[Raw ") != std::string::npos;
+        if (Pm64::EncodeText(text, charset) != bytes) {
+            if (mismatches++ < 10) {
+                std::printf("    mismatch: %s\n", name.c_str());
+            }
+        }
+    }
+    std::printf("  %zu messages in %.2fs, %zu with raw bytes\n", messages.size(), seconds, raw);
+    CHECK(!messages.empty());
+    CHECK(mismatches == 0);
+}
+
 void TestFontGenerator() {
     FontGenerator generator;
     CHECK(generator.Load(fs::path(NEORETRO_ASSETS_DIR) / "fonts/GoogleSans-Regular.ttf"));
@@ -671,6 +756,8 @@ int main() {
         { "generate custom and sequences", TestGenerateCustomAndSequences },
         { "sm64 text", TestSm64Text },
         { "real sm64 archive", TestRealSm64Archive },
+        { "pm64 text", TestPm64Text },
+        { "real pm64 archive", TestRealPm64Archive },
         { "update feed", TestUpdateFeed },
         { "font generator", TestFontGenerator },
         { "gliden order and aliases", TestGlidenOrderAndAliases },
