@@ -23,6 +23,9 @@ void GameSelectionScreen::Layout(AppContext& ctx) {
             if (OptionCard(ui, "GameSelection_Soh", Tr("gameSelectionScreenSoh_title"), Icons::DirectionsBoatFilled)) {
                 ctx.router.Push("/game_selection/soh");
             }
+            if (OptionCard(ui, "GameSelection_Ghostship", Tr("gameSelectionScreenGhostship_title"), Icons::Star)) {
+                ctx.router.Push("/game_selection/ghostship");
+            }
             if (OptionCard(ui, "GameSelection_2Ship", Tr("gameSelectionScreen2Ship_title"), Icons::DarkMode)) {
                 ctx.toasts.Post({ Tr("gameSelection2ShipComingSoon_text"), RetroColors::Cream, RetroColors::Black,
                                   Icons::Favorite, RetroColors::Red, 4.0f });
@@ -45,6 +48,28 @@ void SohGameScreen::Layout(AppContext& ctx) {
             }
             if (OptionCard(ui, "SohGame_Font", Tr("sohCreateDebugFontScreen_title"), Icons::TextFields)) {
                 ctx.router.Push("/debug_generate_font");
+            }
+        });
+    });
+}
+
+void GhostshipGameScreen::Layout(AppContext& ctx) {
+    auto& ui = ctx.ui;
+    ScaffoldOptions options;
+    options.title = Tr("gameSelectionScreenGhostship_title");
+    options.subtitle = Tr("gameSelectionScreenGhostship_subtitle");
+    options.onBackButtonPressed = [&] { ctx.router.Pop(); };
+
+    CustomScaffold(ui, options, [&] {
+        CenteredCards(ui, "GhostshipGame_Cards", 15, [&] {
+            if (OptionCard(ui, "GhostshipGame_Dialogs", Tr("ghostshipTextScreen_dialogs"), Icons::Chat)) {
+                ctx.router.Push("/game_selection/ghostship/dialogs");
+            }
+            if (OptionCard(ui, "GhostshipGame_Texts", Tr("ghostshipTextScreen_texts"), Icons::Title)) {
+                ctx.router.Push("/game_selection/ghostship/texts");
+            }
+            if (OptionCard(ui, "GhostshipGame_Strings", Tr("ghostshipTextScreen_strings"), Icons::Translate)) {
+                ctx.router.Push("/game_selection/ghostship/strings");
             }
         });
     });

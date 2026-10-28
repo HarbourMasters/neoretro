@@ -3,6 +3,7 @@
 #include "TextureManifestEntry.h"
 
 #include <filesystem>
+#include <string>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -21,6 +22,10 @@ struct CustomTexturesEntry {
     std::vector<TexturePair> pairs;
 };
 
-using StageEntry = std::variant<CustomStageEntry, CustomSequencesEntry, CustomTexturesEntry>;
+struct ResourceDataEntry {
+    std::vector<std::pair<std::string, std::vector<char>>> resources;
+};
+
+using StageEntry = std::variant<CustomStageEntry, CustomSequencesEntry, CustomTexturesEntry, ResourceDataEntry>;
 
 std::vector<std::filesystem::path> StageEntryFiles(const StageEntry& entry);

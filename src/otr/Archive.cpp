@@ -26,12 +26,17 @@ bool IsReservedMpqName(const std::string& name) {
 class ZipReader : public ArchiveReader {
   public:
     static std::unique_ptr<ZipReader> Open(const std::string& path) {
-        std::ifstream stream(std::filesystem::path(std::u8string(path.begin(), path.end())), std::ios::binary);
+        std::ifstream stream(std::filesystem::path(std::u8string(path.begin(), path.end())),
+                             std::ios::binary | std::ios::ate);
         if (!stream) {
             return nullptr;
         }
         auto reader = std::unique_ptr<ZipReader>(new ZipReader());
-        reader->mData.assign(std::istreambuf_iterator<char>(stream), {});
+        reader->mData.resize((size_t)stream.tellg());
+        stream.seekg(0);
+        if (!stream.read((char*)reader->mData.data(), (std::streamsize)reader->mData.size())) {
+            return nullptr;
+        }
         if (!reader->ReadCentralDirectory()) {
             SPDLOG_ERROR("{} is not a valid O2R (zip) archive", path);
             return nullptr;

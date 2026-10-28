@@ -6,6 +6,7 @@
 #include "utils/Jobs.h"
 #include "utils/Paths.h"
 
+#include <algorithm>
 #include <spdlog/spdlog.h>
 
 namespace {
@@ -85,6 +86,28 @@ void StageManager::AddCustomTextureEntry(const std::map<std::string, std::vector
     mState = AppState::ChangesStaged;
 }
 
+void StageManager::AddResourceData(const std::string& path, const std::string& name, std::vector<char> data) {
+    mRevision++;
+    auto it = mEntries.find(path);
+    if (it == mEntries.end()) {
+        it = mEntries.emplace(path, ResourceDataEntry{}).first;
+    }
+    auto* resources = std::get_if<ResourceDataEntry>(&it->second);
+    if (resources == nullptr) {
+        mToasts.Error("Cannot add resource data to existing entry");
+        return;
+    }
+    const auto existing = std::find_if(resources->resources.begin(), resources->resources.end(),
+                                       [&](const auto& resource) { return resource.first == name; });
+    if (existing != resources->resources.end()) {
+        existing->second = std::move(data);
+    } else {
+        resources->resources.emplace_back(name, std::move(data));
+        mTotalFiles++;
+    }
+    mState = AppState::ChangesStaged;
+}
+
 void StageManager::AddFile(const std::filesystem::path& file, const std::string& path) {
     mRevision++;
     mEntries[path] = CustomStageEntry{ { file } };
@@ -105,6 +128,8 @@ void StageManager::RemoveFile(const std::filesystem::path& file, const std::stri
         std::erase_if(sequences->pairs, [&](const auto& pair) { return pair.first == file || pair.second == file; });
     } else if (auto* textures = std::get_if<CustomTexturesEntry>(&it->second)) {
         std::erase_if(textures->pairs, [&](const auto& pair) { return pair.first == file; });
+    } else if (auto* resources = std::get_if<ResourceDataEntry>(&it->second)) {
+        std::erase_if(resources->resources, [&](const auto& resource) { return file == resource.first; });
     }
     mTotalFiles = std::max(0, mTotalFiles - 1);
 

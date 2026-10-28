@@ -12,6 +12,10 @@ std::vector<std::filesystem::path> StageEntryFiles(const StageEntry& entry) {
         for (const auto& pair : textures->pairs) {
             files.push_back(pair.first);
         }
+    } else if (const auto* resources = std::get_if<ResourceDataEntry>(&entry)) {
+        for (const auto& resource : resources->resources) {
+            files.push_back(resource.first);
+        }
     }
     return files;
 }

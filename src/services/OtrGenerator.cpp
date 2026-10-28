@@ -107,6 +107,11 @@ bool Generate(const std::map<std::string, StageEntry>& entries, const std::strin
             }
         } else if (const auto* textures = std::get_if<CustomTexturesEntry>(&entry)) {
             AddTextures(archive, key, textures->pairs, prependAlt, filesProcessed, onError);
+        } else if (const auto* resources = std::get_if<ResourceDataEntry>(&entry)) {
+            for (const auto& [name, data] : resources->resources) {
+                archive.Add(EntryFilePath(key, name), data);
+                filesProcessed++;
+            }
         }
     }
 

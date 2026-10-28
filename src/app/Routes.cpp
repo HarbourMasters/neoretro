@@ -8,6 +8,7 @@
 #include "features/debug/DebugFontGeneratorScreen.h"
 #include "features/debug/DebugSelectionScreen.h"
 #include "features/games/GameScreens.h"
+#include "features/games/ghostship/GhostshipTextScreen.h"
 #include "features/home/HomeScreen.h"
 #include "features/inspect_otr/InspectOtrScreen.h"
 
@@ -21,7 +22,14 @@ void RegisterRoutes(Router& router) {
     route.operator()<CreateSelectionScreen>("/create_selection");
     route.operator()<GameSelectionScreen>("/game_selection");
     route.operator()<SohGameScreen>("/game_selection/soh");
+    route.operator()<GhostshipGameScreen>("/game_selection/ghostship");
     route.operator()<Ship2GameScreen>("/game_selection/2ship");
+    auto ghostshipText = [&router](const char* name, GhostshipTextKind kind) {
+        router.Register(name, [kind] { return std::make_unique<GhostshipTextScreen>(kind); });
+    };
+    ghostshipText("/game_selection/ghostship/dialogs", GhostshipTextKind::Dialogs);
+    ghostshipText("/game_selection/ghostship/texts", GhostshipTextKind::Texts);
+    ghostshipText("/game_selection/ghostship/strings", GhostshipTextKind::Strings);
     route.operator()<CreateCustomScreen>("/create_custom");
     route.operator()<InspectOtrScreen>("/view_otr");
     route.operator()<CreateCustomSequencesScreen>("/create_custom_sequences");

@@ -1,4 +1,5 @@
 #include "games/bk64/Bk64Conventions.h"
+#include "games/sm64/Sm64Text.h"
 #include "image/Image.h"
 #include "otr/Archive.h"
 #include "otr/Exporters.h"
@@ -397,6 +398,89 @@ void TestGenerateCustomAndSequences() {
     CHECK(header && header->type == (uint32_t)Otr::ResourceType::OoTAudioSequence);
 }
 
+void TestSm64Text() {
+    const std::vector<uint8_t> hello = { 0x11, 0x28, 0x2F, 0x2F, 0x32, 0x9E, 0xD2, 0xF2, 0xFE, 0x54, 0xFA, 0x7B, 0xFF };
+    const std::string decoded = Sm64::DecodeText(hello);
+    CHECK(decoded == "Hello {you}!\n[A]{star}{7B}");
+    CHECK(Sm64::EncodeText(decoded) == hello);
+    CHECK(Sm64::EncodeText("\xe2\x98\x85{mario}") == (std::vector<uint8_t>{ 0xFA, 0x40, 0x41, 0xFF }));
+    CHECK(Sm64::EncodeText("a\r\nb") == (std::vector<uint8_t>{ 0x24, 0xFE, 0x25, 0xFF }));
+    std::string error;
+    CHECK(!Sm64::EncodeText("bad #", &error));
+    CHECK(error.find('#') != std::string::npos);
+
+    Sm64::Dialog dialog;
+    dialog.linesPerBox = 6;
+    dialog.leftOffset = 95;
+    dialog.width = 150;
+    dialog.text = hello;
+    const auto dialogData = Sm64::ExportDialog(dialog, "texts/dialogs/dialog_00");
+    const auto parsedDialog = Sm64::ParseDialog(std::vector<uint8_t>(dialogData.begin(), dialogData.end()));
+    CHECK(parsedDialog && parsedDialog->linesPerBox == 6 && parsedDialog->leftOffset == 95 &&
+          parsedDialog->width == 150 && parsedDialog->text == hello);
+
+    const auto textData = Sm64::ExportText(hello, "texts/courses/course_00");
+    CHECK(Sm64::ParseText(std::vector<uint8_t>(textData.begin(), textData.end())) == hello);
+
+    const Sm64::Dictionary dictionary = { { "TEXT_A", { 0x0A, 0xFF } }, { "TEXT_HELLO", hello } };
+    const auto dictionaryData = Sm64::ExportDictionary(dictionary, "texts/strings/global");
+    CHECK(Sm64::ParseDictionary(std::vector<uint8_t>(dictionaryData.begin(), dictionaryData.end())) == dictionary);
+    CHECK(!Sm64::ParseDialog(std::vector<uint8_t>(textData.begin(), textData.end())));
+
+    const fs::path dir = TempDir("sm64");
+    std::map<std::string, StageEntry> stage;
+    stage["texts/dialogs"] = ResourceDataEntry{ { { "dialog_00", dialogData } } };
+    stage["texts/strings"] = ResourceDataEntry{ { { "global", dictionaryData } } };
+    const std::string output = (dir / "text.o2r").string();
+    std::atomic<int> processed = 0;
+    CHECK(OtrGenerator::Generate(stage, output, true, processed, [](const std::string&) {}));
+    CHECK(processed == 2);
+    auto reader = Otr::ArchiveReader::Open(output);
+    const auto assets = reader ? Sm64::LoadTextAssets(*reader) : Sm64::TextAssets{};
+    CHECK(assets.dialogs.size() == 1 && assets.dialogs.count("texts/dialogs/dialog_00"));
+    CHECK(assets.strings == dictionary);
+}
+
+void TestRealSm64Archive() {
+    const char* path = std::getenv("NEORETRO_TEST_SM64_ARCHIVE");
+    if (path == nullptr) {
+        std::printf("  (skipped: set NEORETRO_TEST_SM64_ARCHIVE)\n");
+        return;
+    }
+    auto reader = Otr::ArchiveReader::Open(path);
+    CHECK(reader != nullptr);
+    if (!reader) {
+        return;
+    }
+    const auto start = std::chrono::steady_clock::now();
+    const auto assets = Sm64::LoadTextAssets(*reader);
+    const auto seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    std::printf("  %zu dialogs, %zu texts, %zu strings in %.2fs\n", assets.dialogs.size(), assets.texts.size(),
+                assets.strings ? assets.strings->size() : 0, seconds);
+    CHECK(!assets.dialogs.empty() && !assets.texts.empty() && assets.strings);
+    size_t mismatches = 0;
+    const auto roundTrip = [&](const std::string& name, const std::vector<uint8_t>& bytes) {
+        const auto end = std::find(bytes.begin(), bytes.end(), Sm64::kTerminator);
+        const std::vector<uint8_t> expected(bytes.begin(), end == bytes.end() ? end : end + 1);
+        if (Sm64::EncodeText(Sm64::DecodeText(bytes)) != expected) {
+            mismatches++;
+            std::printf("    mismatch: %s\n", name.c_str());
+        }
+    };
+    for (const auto& [name, dialog] : assets.dialogs) {
+        roundTrip(name, dialog.text);
+    }
+    for (const auto& [name, text] : assets.texts) {
+        roundTrip(name, text);
+    }
+    if (assets.strings) {
+        for (const auto& [key, value] : *assets.strings) {
+            roundTrip(key, value);
+        }
+    }
+    CHECK(mismatches == 0);
+}
+
 void TestFontGenerator() {
     FontGenerator generator;
     CHECK(generator.Load(fs::path(NEORETRO_ASSETS_DIR) / "fonts/GoogleSans-Regular.ttf"));
@@ -556,6 +640,8 @@ int main() {
         { "bk64 conventions", TestBk64Conventions },
         { "replace textures flow", TestReplaceTexturesFlow },
         { "generate custom and sequences", TestGenerateCustomAndSequences },
+        { "sm64 text", TestSm64Text },
+        { "real sm64 archive", TestRealSm64Archive },
         { "font generator", TestFontGenerator },
         { "gliden order and aliases", TestGlidenOrderAndAliases },
         { "thread pool", TestThreadPool },

@@ -45,6 +45,10 @@ constexpr const char* Close = "\xee\x97\x8d";
 constexpr const char* Delete = "\xee\xa1\xb2";
 constexpr const char* Memory = "\xee\x8c\xa2";
 constexpr const char* ArrowDropDown = "\xee\x97\x85";
+constexpr const char* Star = "\xee\xa0\xb8";
+constexpr const char* Chat = "\xee\x82\xb7";
+constexpr const char* Title = "\xee\x89\xa4";
+constexpr const char* Translate = "\xee\xa3\xa2";
 } // namespace Icons
 
 namespace Theme {

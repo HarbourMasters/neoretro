@@ -96,7 +96,7 @@ IDI_ICON1               ICON                    "neoretro.ico"
 // RT_MANIFEST
 //
 
-1                       RT_MANIFEST             "ghostship.manifest"
+1                       RT_MANIFEST             "neoretro.manifest"
 
 #endif    // English (United States) resources
 /////////////////////////////////////////////////////////////////////////////

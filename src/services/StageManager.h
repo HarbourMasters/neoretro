@@ -39,6 +39,7 @@ class StageManager {
     void AddCustomSequenceEntry(const std::vector<std::pair<std::filesystem::path, std::filesystem::path>>& pairs,
                                 const std::string& path);
     void AddCustomTextureEntry(const std::map<std::string, std::vector<TexturePair>>& replacementMap);
+    void AddResourceData(const std::string& path, const std::string& name, std::vector<char> data);
     void AddFile(const std::filesystem::path& file, const std::string& path);
     void RemoveFile(const std::filesystem::path& file, const std::string& path);
 
