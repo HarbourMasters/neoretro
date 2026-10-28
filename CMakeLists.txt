@@ -344,7 +344,10 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nfd)
 
-#=================== libcurl (optional) ===================
+#=================== libcurl ===================
+if (NOT TARGET ZLIB::ZLIB AND TARGET zlibstatic)
+    add_library(ZLIB::ZLIB ALIAS zlibstatic)
+endif()
 find_package(CURL QUIET)
 
 target_link_libraries(${PROJECT_NAME}-core PUBLIC
