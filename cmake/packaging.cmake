@@ -86,6 +86,7 @@ execute_process(
     $<$<BOOL:$<TARGET_PROPERTY:neoretro,APPIMAGE_ICON_FILE>>:--icon-file=$<TARGET_PROPERTY:neoretro,APPIMAGE_ICON_FILE>>
     --output=appimage
     --verbosity=2
+  COMMAND_ERROR_IS_FATAL ANY
 )
 ]])
 string(CONFIGURE "${APPIMAGE_GENERATE_SCRIPT}" APPIMAGE_GENERATE_SCRIPT @ONLY)

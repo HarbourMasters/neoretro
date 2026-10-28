@@ -264,12 +264,25 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(torch)
 target_include_directories(torch PUBLIC ${torch_SOURCE_DIR}/lib/StormLib/src)
-foreach(STBIW_SYMBOL stbi_write_png stbi_write_bmp stbi_write_tga stbi_write_hdr stbi_write_jpg
-        stbi_write_png_to_func stbi_write_bmp_to_func stbi_write_tga_to_func stbi_write_hdr_to_func
-        stbi_write_jpg_to_func stbi_write_png_to_mem stbi_flip_vertically_on_write
-        stbiw_convert_wchar_to_utf8 stbi_zlib_compress stbi_write_tga_with_rle
+foreach(STB_SYMBOL
+        stbi_convert_iphone_png_to_rgb stbi_convert_iphone_png_to_rgb_thread stbi_failure_reason
+        stbi_hdr_to_ldr_gamma stbi_hdr_to_ldr_scale stbi_image_free stbi_info stbi_info_from_callbacks
+        stbi_info_from_file stbi_info_from_memory stbi_is_16_bit stbi_is_16_bit_from_callbacks
+        stbi_is_16_bit_from_file stbi_is_16_bit_from_memory stbi_is_hdr stbi_is_hdr_from_callbacks
+        stbi_is_hdr_from_file stbi_is_hdr_from_memory stbi_ldr_to_hdr_gamma stbi_ldr_to_hdr_scale stbi_load
+        stbi_load_16 stbi_load_16_from_callbacks stbi_load_16_from_memory stbi_load_from_callbacks
+        stbi_load_from_file stbi_load_from_file_16 stbi_load_from_memory stbi_load_gif_from_memory stbi_loadf
+        stbi_loadf_from_callbacks stbi_loadf_from_file stbi_loadf_from_memory
+        stbi_set_flip_vertically_on_load stbi_set_flip_vertically_on_load_thread
+        stbi_set_unpremultiply_on_load stbi_set_unpremultiply_on_load_thread stbi_zlib_decode_buffer
+        stbi_zlib_decode_malloc stbi_zlib_decode_malloc_guesssize
+        stbi_zlib_decode_malloc_guesssize_headerflag stbi_zlib_decode_noheader_buffer
+        stbi_zlib_decode_noheader_malloc stbi_write_png stbi_write_bmp stbi_write_tga stbi_write_hdr
+        stbi_write_jpg stbi_write_png_to_func stbi_write_bmp_to_func stbi_write_tga_to_func
+        stbi_write_hdr_to_func stbi_write_jpg_to_func stbi_write_png_to_mem stbi_write_plte_png_to_mem
+        stbi_flip_vertically_on_write stbiw_convert_wchar_to_utf8 stbi_zlib_compress stbi_write_tga_with_rle
         stbi_write_png_compression_level stbi_write_force_png_filter)
-    target_compile_definitions(N64Graphics PRIVATE ${STBIW_SYMBOL}=n64g_${STBIW_SYMBOL})
+    target_compile_definitions(N64Graphics PUBLIC ${STB_SYMBOL}=n64g_${STB_SYMBOL})
 endforeach()
 target_compile_definitions(torch PUBLIC USE_STORMLIB $<$<BOOL:${MSVC}>:STORMLIB_NO_AUTO_LINK>)
 
@@ -481,7 +494,7 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
     install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/ DESTINATION assets COMPONENT ${PROJECT_NAME})
     set_property(TARGET ${PROJECT_NAME} PROPERTY APPIMAGE_DESKTOP_FILE_TERMINAL YES)
     set_property(TARGET ${PROJECT_NAME} PROPERTY APPIMAGE_DESKTOP_FILE "${CMAKE_SOURCE_DIR}/${PROJECT_NAME}.desktop")
-    set_property(TARGET ${PROJECT_NAME} PROPERTY APPIMAGE_ICON_FILE "${CMAKE_SOURCE_DIR}/logo.png")
+    set_property(TARGET ${PROJECT_NAME} PROPERTY APPIMAGE_ICON_FILE "${CMAKE_SOURCE_DIR}/${PROJECT_NAME}.png")
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
