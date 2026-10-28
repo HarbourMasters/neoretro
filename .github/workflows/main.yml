@@ -63,7 +63,7 @@ jobs:
       - name: Build
         run: |
           if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT }
-          cmake -S . -B "build/${{ matrix.arch }}" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache ${{ inputs.version && format('-DNEORETRO_VERSION={0}', inputs.version) || '' }}
+          cmake -S . -B "build/${{ matrix.arch }}" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache ${{ inputs.version && format('-DNEORETRO_VERSION={0} -DNEORETRO_SELF_UPDATE=ON', inputs.version) || '' }}
           cmake --build ./build/${{ matrix.arch }} --parallel 10
       - name: Test
         run: ./build/${{ matrix.arch }}/neoretro-tests.exe
@@ -123,7 +123,7 @@ jobs:
             ${{ runner.os }}-universal-ccache
       - name: Build (Universal)
         run: |
-          cmake --no-warn-unused-cli -H. -Bbuild-cmake -GNinja -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache ${{ inputs.version && format('-DNEORETRO_VERSION={0}', inputs.version) || '' }}
+          cmake --no-warn-unused-cli -H. -Bbuild-cmake -GNinja -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache ${{ inputs.version && format('-DNEORETRO_VERSION={0} -DNEORETRO_SELF_UPDATE=ON', inputs.version) || '' }}
           cmake --build build-cmake --config Release --parallel 10
       - name: Test
         run: |
@@ -134,6 +134,7 @@ jobs:
         run: |
           (cd build-cmake && cpack)
           mv _packages/*.dmg neoretro.dmg
+          ditto -c -k --keepParent build-cmake/_CPack_Packages/Darwin/Bundle/*/neoretro.app neoretro-mac.zip
           cp README.md readme.txt
       - name: Publish packaged artifacts
         uses: actions/upload-artifact@v4
@@ -141,6 +142,7 @@ jobs:
           name: neoretro-mac-universal
           path: |
             neoretro.dmg
+            neoretro-mac.zip
             readme.txt
 
   build-linux:
@@ -178,7 +180,7 @@ jobs:
             linux-${{ matrix.arch }}-ccache-
       - name: Build
         run: |
-          cmake -H. -Bbuild-cmake -GNinja -DCMAKE_BUILD_TYPE=Release -D CMAKE_C_COMPILER_LAUNCHER=ccache -D CMAKE_CXX_COMPILER_LAUNCHER=ccache ${{ inputs.version && format('-DNEORETRO_VERSION={0}', inputs.version) || '' }}
+          cmake -H. -Bbuild-cmake -GNinja -DCMAKE_BUILD_TYPE=Release -D CMAKE_C_COMPILER_LAUNCHER=ccache -D CMAKE_CXX_COMPILER_LAUNCHER=ccache ${{ inputs.version && format('-DNEORETRO_VERSION={0} -DNEORETRO_SELF_UPDATE=ON', inputs.version) || '' }}
           cmake --build build-cmake --config Release -j4
       - name: Test
         run: ./build-cmake/neoretro-tests

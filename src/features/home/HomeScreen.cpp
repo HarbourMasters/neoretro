@@ -3,7 +3,7 @@
 #include "app/AppContext.h"
 #include "app/Router.h"
 #include "l10n/Strings.h"
-#include "services/UpdateChecker.h"
+#include "services/Updater.h"
 #include "ui/clay/ClayUi.h"
 #include "ui/components/GradientText.h"
 #include "ui/components/OptionCard.h"
@@ -11,7 +11,6 @@
 #include "ui/theme/Colors.h"
 #include "ui/theme/Theme.h"
 #include "build.h"
-#include "utils/Platform.h"
 
 #include <imgui.h>
 #include <spdlog/fmt/fmt.h>
@@ -39,17 +38,13 @@ void UpdateBanner(ClayUi& ui) {
                          .attachPoints = { CLAY_ATTACH_POINT_LEFT_TOP, CLAY_ATTACH_POINT_LEFT_TOP },
                          .attachTo = CLAY_ATTACH_TO_PARENT } }) {
         Widgets::Text(ui, Icons::WarningAmber, 25, RetroColors::Yellow700, FONT_ICONS);
-        Widgets::Text(ui, "New version available", 15, RetroColors::Yellow700);
+        Widgets::Text(ui, Tr("updater_newVersion"), 15, RetroColors::Yellow700);
     }
     if (ui.Clicked(id)) {
-        Platform::OpenUrl(gReleasesUrl);
+        Updater::ShowDialog();
     }
 }
 } // namespace
-
-void HomeScreen::OnEnter(AppContext& ctx) {
-    UpdateChecker::Start();
-}
 
 void HomeScreen::Layout(AppContext& ctx) {
     auto& ui = ctx.ui;
@@ -87,7 +82,7 @@ void HomeScreen::Layout(AppContext& ctx) {
         Widgets::Text(ui, fmt::format("{} - {}", hash, branch), TextSize::TitleSmall, kFaded, FONT_MEDIUM);
         Widgets::Text(ui, gBuildDate, TextSize::TitleSmall, kFaded, FONT_MEDIUM);
 
-        if (UpdateChecker::UpdateAvailable()) {
+        if (Updater::UpdateAvailable() && !Updater::DialogVisible()) {
             UpdateBanner(ui);
         }
     }

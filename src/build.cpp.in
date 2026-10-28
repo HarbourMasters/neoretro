@@ -14,7 +14,6 @@ const char gBuildTeam[] = "@PROJECT_TEAM@";
 const char gBuildDate[] = __DATE__ " " __TIME__;
 const char gBuildMakeOption[] = "";
 
-const uint32_t gVersionCode = @NEORETRO_VERSION_CODE@;
 const char gRepositoryUrl[] = "@NEORETRO_REPOSITORY_URL@";
-const char gReleaseJsonUrl[] = "@NEORETRO_RELEASE_JSON_URL@";
+const char gUpdateFeedUrl[] = "@NEORETRO_UPDATE_FEED_URL@";
 const char gReleasesUrl[] = "@NEORETRO_RELEASES_URL@";

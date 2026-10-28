@@ -9,6 +9,7 @@
 #include "services/OtrGenerator.h"
 #include "services/TextureBuilder.h"
 #include "services/TextureReplacement.h"
+#include "services/UpdateFeed.h"
 #include "utils/Hash.h"
 #include "utils/Paths.h"
 #include "utils/ThreadPool.h"
@@ -481,6 +482,34 @@ void TestRealSm64Archive() {
     CHECK(mismatches == 0);
 }
 
+void TestUpdateFeed() {
+    CHECK(UpdateFeed::IsNewer("1.10.0", "1.9.9"));
+    CHECK(UpdateFeed::IsNewer("0.2", "0.1.9"));
+    CHECK(!UpdateFeed::IsNewer("1.0", "1.0.0"));
+    CHECK(!UpdateFeed::IsNewer("0.9.9", "1.0.0"));
+    CHECK(UpdateFeed::IsValidVersion("1.2.3"));
+    CHECK(!UpdateFeed::IsValidVersion("1..2"));
+    CHECK(!UpdateFeed::IsValidVersion("v1.2"));
+    CHECK(!UpdateFeed::IsValidVersion(""));
+
+    const std::string sha(64, 'A');
+    const std::string feed = R"({"version": "0.2.0", "notes": "Fixes",
+        "assets": {"linux-x64": {"url": "https://example.com/neoretro.AppImage", "sha256": ")" +
+                             sha + R"("},
+                   "windows-x64": {"url": "http://example.com/neoretro.zip", "sha256": ")" +
+                             sha + R"("}}})";
+    const auto release = UpdateFeed::Parse(feed, "linux-x64");
+    CHECK(release && release->version == "0.2.0" && release->notes == "Fixes" &&
+          release->sha256 == std::string(64, 'a'));
+    std::string error;
+    CHECK(!UpdateFeed::Parse(feed, "windows-x64", &error));
+    CHECK(!error.empty());
+    CHECK(!UpdateFeed::Parse(feed, "mac-universal"));
+    CHECK(!UpdateFeed::Parse("not json", "linux-x64"));
+    CHECK(!UpdateFeed::Parse(R"({"version": 2, "assets": {}})", "linux-x64"));
+    CHECK(std::string(UpdateFeed::PlatformKey()).find('-') != std::string::npos);
+}
+
 void TestFontGenerator() {
     FontGenerator generator;
     CHECK(generator.Load(fs::path(NEORETRO_ASSETS_DIR) / "fonts/GoogleSans-Regular.ttf"));
@@ -642,6 +671,7 @@ int main() {
         { "generate custom and sequences", TestGenerateCustomAndSequences },
         { "sm64 text", TestSm64Text },
         { "real sm64 archive", TestRealSm64Archive },
+        { "update feed", TestUpdateFeed },
         { "font generator", TestFontGenerator },
         { "gliden order and aliases", TestGlidenOrderAndAliases },
         { "thread pool", TestThreadPool },

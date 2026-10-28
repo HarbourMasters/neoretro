@@ -49,6 +49,8 @@ constexpr const char* Star = "\xee\xa0\xb8";
 constexpr const char* Chat = "\xee\x82\xb7";
 constexpr const char* Title = "\xee\x89\xa4";
 constexpr const char* Translate = "\xee\xa3\xa2";
+constexpr const char* CheckBox = "\xee\xa0\xb4";
+constexpr const char* CheckBoxOutlineBlank = "\xee\xa0\xb5";
 } // namespace Icons
 
 namespace Theme {

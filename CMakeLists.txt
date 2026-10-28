@@ -120,10 +120,10 @@ endif()
 ################################################################################
 # Sources
 ################################################################################
-set(NEORETRO_VERSION_CODE 0 CACHE STRING "Compared against release.json's version for the update banner")
-set(NEORETRO_REPOSITORY_URL "https://github.com/HarbourMasters/retro" CACHE STRING "Opened from the status bar")
-set(NEORETRO_RELEASE_JSON_URL "https://raw.githubusercontent.com/HarbourMasters/retro/main/release.json" CACHE STRING "Empty disables the update check")
-set(NEORETRO_RELEASES_URL "https://github.com/HarbourMasters/retro/releases/latest" CACHE STRING "Opened from the update banner")
+set(NEORETRO_REPOSITORY_URL "https://github.com/HarbourMasters/neoretro" CACHE STRING "Opened from the status bar")
+set(NEORETRO_UPDATE_FEED_URL "${NEORETRO_REPOSITORY_URL}/releases/latest/download/appcast.json" CACHE STRING "Empty disables the update check")
+set(NEORETRO_RELEASES_URL "${NEORETRO_REPOSITORY_URL}/releases/latest" CACHE STRING "Opened when an update can't be installed automatically")
+option(NEORETRO_SELF_UPDATE "Let packaged builds download and install updates themselves" OFF)
 
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/src/build.cpp.in ${CMAKE_CURRENT_SOURCE_DIR}/src/build.cpp @ONLY)
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/properties.h.in ${CMAKE_CURRENT_SOURCE_DIR}/properties.h @ONLY)
@@ -147,7 +147,7 @@ foreach(source IN LISTS ALL_FILES)
 endforeach()
 
 set(CORE_FILES ${ALL_FILES})
-list(FILTER CORE_FILES INCLUDE REGEX "^src/(otr|image|models|games)/|^src/services/(TextureBuilder|OtrGenerator|TextureReplacement|FontGenerator)\\.|^src/utils/(Hash|Paths|ThreadPool)\\.")
+list(FILTER CORE_FILES INCLUDE REGEX "^src/(otr|image|models|games)/|^src/services/(TextureBuilder|OtrGenerator|TextureReplacement|FontGenerator|UpdateFeed)\\.|^src/utils/(Hash|Paths|ThreadPool)\\.")
 list(REMOVE_ITEM ALL_FILES ${CORE_FILES})
 
 add_executable(${PROJECT_NAME} ${ALL_FILES})
@@ -373,6 +373,10 @@ set(ADDITIONAL_LIBRARY_DEPENDENCIES
 if (CURL_FOUND)
     list(APPEND ADDITIONAL_LIBRARY_DEPENDENCIES CURL::libcurl)
     target_compile_definitions(${PROJECT_NAME} PRIVATE NEORETRO_UPDATE_CHECK)
+endif()
+
+if (NEORETRO_SELF_UPDATE)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE NEORETRO_SELF_UPDATE)
 endif()
 
 if (APPLE)

@@ -87,6 +87,24 @@
     "gameSelectionScreen2Ship_subtitle": "Select the tool you want to use",
     "gameSelection2ShipComingSoon_text": "2 Ship 2 Harkinian Tools are coming soon!",
 
+    "updater_newVersion": "New version available",
+    "updater_checkForUpdates": "Check for updates",
+    "updater_checking": "Checking for updates...",
+    "updater_available": "neoretro {} is available",
+    "updater_youHave": "You have {}.",
+    "updater_manualInstall": "This copy can't update itself, so Download opens the releases page.",
+    "updater_autoCheck": "Check for updates automatically",
+    "updater_install": "Install & Relaunch",
+    "updater_download": "Download",
+    "updater_later": "Later",
+    "updater_skip": "Skip This Version",
+    "updater_downloading": "Downloading neoretro {}",
+    "updater_installing": "Installing, neoretro will relaunch",
+    "updater_upToDate": "You're up to date",
+    "updater_failed": "Update failed",
+    "updater_downloadManually": "Download Manually",
+    "updater_close": "Close",
+
     "extractModsWarning_part1": "Extracting existing mods",
     "extractModsWarning_part2": "might not work properly."
 }

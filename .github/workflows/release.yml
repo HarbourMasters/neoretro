@@ -60,6 +60,7 @@ jobs:
             cp "artifacts/neoretro-linux-$arch/neoretro.appimage" "release/neoretro-$VERSION-linux-$arch.AppImage"
           done
           cp artifacts/neoretro-mac-universal/neoretro.dmg "release/neoretro-$VERSION-mac-universal.dmg"
+          cp artifacts/neoretro-mac-universal/neoretro-mac.zip "release/neoretro-$VERSION-mac-universal.zip"
           ls -la release
 
       - name: Create GitHub Release
@@ -71,3 +72,24 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --title "neoretro $VERSION" \
             --generate-notes
+
+      - name: Publish update feed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/v$VERSION"
+          asset() {
+            jq -n --arg url "$base/$2" --arg sha "$(sha256sum "release/$2" | cut -d' ' -f1)" \
+              '{($ARGS.positional[0]): {url: $url, sha256: $sha}}' --args "$1"
+          }
+          notes="$(gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" --json body --jq .body)"
+          {
+            asset windows-x64 "neoretro-$VERSION-windows-x64.zip"
+            asset mac-universal "neoretro-$VERSION-mac-universal.zip"
+            asset linux-x64 "neoretro-$VERSION-linux-x64.AppImage"
+            asset linux-arm64 "neoretro-$VERSION-linux-arm64.AppImage"
+          } | jq -s --arg version "$VERSION" --arg notes "$notes" \
+            '{version: $version, notes: $notes, assets: add}' > appcast.json
+          cat appcast.json
+          gh release upload "v$VERSION" appcast.json --repo "$GITHUB_REPOSITORY"

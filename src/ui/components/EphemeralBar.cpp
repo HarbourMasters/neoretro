@@ -4,6 +4,7 @@
 #include "Widgets.h"
 #include "app/AppContext.h"
 #include "l10n/Strings.h"
+#include "services/Updater.h"
 #include "services/StageManager.h"
 #include "ui/clay/ClayUi.h"
 #include "ui/theme/Colors.h"
@@ -104,9 +105,19 @@ void EphemeralBar::Bar(AppContext& ctx, bool expanded) {
                .layout = { .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
                            .childGap = 4,
                            .childAlignment = { CLAY_ALIGN_X_RIGHT, CLAY_ALIGN_Y_CENTER } } }) {
-            Widgets::Text(ui,
-                          fmt::format("neoretro: {}.{}.{}", gBuildVersionMajor, gBuildVersionMinor, gBuildVersionPatch),
-                          TextSize::BodyMedium, RetroColors::White);
+            const Clay_ElementId versionId = CLAY_ID("EphemeralBar_CheckUpdates");
+            const bool versionHovered = ui.Hovered(versionId);
+            if (versionHovered) {
+                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                ImGui::SetTooltip("%s", Tr("updater_checkForUpdates"));
+            }
+            CLAY({ .id = versionId }) {
+                Widgets::Text(ui, "neoretro: " + Updater::CurrentVersion(), TextSize::BodyMedium,
+                              versionHovered ? RetroColors::WithOpacity(RetroColors::White, 0.8f) : RetroColors::White);
+            }
+            if (ui.Clicked(versionId)) {
+                Updater::Check(false);
+            }
             if (!expanded && gRepositoryUrl[0] != '\0' &&
                 Widgets::IconButton(ui, "EphemeralBar_Repository", Icons::Memory, 14, RetroColors::White, 5)) {
                 Platform::OpenUrl(gRepositoryUrl);

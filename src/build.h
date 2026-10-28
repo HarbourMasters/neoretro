@@ -16,9 +16,8 @@ extern const char gBuildTeam[];
 extern const char gBuildDate[];
 extern const char gBuildMakeOption[];
 
-extern const uint32_t gVersionCode;
 extern const char gRepositoryUrl[];
-extern const char gReleaseJsonUrl[];
+extern const char gUpdateFeedUrl[];
 extern const char gReleasesUrl[];
 
 #endif

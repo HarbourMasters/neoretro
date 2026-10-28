@@ -1,6 +1,8 @@
 #include "Application.h"
 
 #include "l10n/Strings.h"
+#include "services/Updater.h"
+#include "ui/components/UpdateDialog.h"
 #include "ui/theme/Colors.h"
 #include "ui/theme/Theme.h"
 #include "utils/FileDialog.h"
@@ -95,8 +97,10 @@ bool Application::Init(const std::string& initialRoute) {
 }
 
 void Application::Run() {
-    while (!WindowShouldClose()) {
+    Updater::Start();
+    while (!WindowShouldClose() && !Updater::QuitRequested()) {
         Jobs::Instance().Update();
+        Updater::Tick();
         DrawFrame();
         mRouter.Apply(*mContext);
     }
@@ -150,6 +154,7 @@ void Application::DrawFrame() {
         }
         mEphemeralBar.Layout(*mContext, viewport->WorkSize.y);
         mToasts.Layout(mUi);
+        UpdateDialog::Layout(mUi);
     }
     mUi.EndLayout();
 
@@ -158,6 +163,7 @@ void Application::DrawFrame() {
     if (screen != nullptr) {
         screen->DrawImGui(*mContext);
     }
+    UpdateDialog::BlockInputBehind();
 
     rlImGuiEnd();
     EndDrawing();

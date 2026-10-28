@@ -4,6 +4,5 @@
 
 class HomeScreen : public Screen {
   public:
-    void OnEnter(AppContext& ctx) override;
     void Layout(AppContext& ctx) override;
 };

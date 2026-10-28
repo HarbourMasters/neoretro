@@ -9,7 +9,13 @@ Retro is a modding tool for games using the OTR file format. Currently only [Shi
 
 All game assets are contained within an OTR file, the system can also recognize patch OTRs, placed in a `mods/` folder, which will replace any assets with the ones found in the patch OTR.
 
-You can download the latest build from [here](https://github.com/HarbourMasters64/retro/releases/latest).
+You can download the latest build from [here](https://github.com/HarbourMasters/neoretro/releases/latest).
+
+## Updates
+
+Release builds check `appcast.json` on the latest GitHub release a few seconds after launch and then every 24 hours; click the version in the status bar to check now. When a newer version exists neoretro offers to install it: it downloads the build for your platform, verifies its SHA-256, replaces itself (the Windows folder, the macOS app after checking its bundle identifier and signature, or the Linux AppImage) and relaunches. **Skip This Version** stops the automatic prompt for that version, and the checkbox in the prompt turns automatic checks off. Both are stored in `updater.json` next to `latest.log`.
+
+A copy that can't replace itself (a development build, a folder you can't write to, or Linux outside an AppImage) still checks, and **Download** opens the releases page instead. Self-updating is compiled in with `-DNEORETRO_SELF_UPDATE=ON`, which the release workflow sets; `NEORETRO_UPDATE_FEED_URL` changes the feed, and an empty value turns checks off. Pushing a `v*` tag builds every platform, publishes the release and then uploads `appcast.json` with the download URL and checksum of each build.
 
 ## Custom Textures
 
