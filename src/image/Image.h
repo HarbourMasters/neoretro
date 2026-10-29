@@ -53,4 +53,8 @@ void CompositeDirect(Image& dst, const Image& src, int dstX, int dstY);
 void CompositeOver(Image& dst, const Image& src, int dstX, int dstY);
 Image PadCanvas(const Image& image, int width, int height);
 uint8_t Luminance(const uint8_t* rgba);
+
+int CountColors(const Image& image, int stopAfter);
+Image MapToPalette(const Image& image, const uint8_t* palette, int colors);
+Image Quantize(const Image& image, int maxColors);
 } // namespace ImageOps

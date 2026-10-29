@@ -1,4 +1,6 @@
 #include "games/bk64/Bk64Conventions.h"
+#include "games/pm64/Pm64Font.h"
+#include "games/pm64/Pm64Images.h"
 #include "games/pm64/Pm64Text.h"
 #include "games/sm64/Sm64Text.h"
 #include "image/Image.h"
@@ -15,6 +17,7 @@
 #include "utils/Paths.h"
 #include "utils/ThreadPool.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -593,6 +596,95 @@ void TestRealPm64Archive() {
     std::printf("  %zu messages in %.2fs, %zu with raw bytes\n", messages.size(), seconds, raw);
     CHECK(!messages.empty());
     CHECK(mismatches == 0);
+
+    const auto font = Pm64::LoadFont(*reader);
+    CHECK(font.glyphs.size() == 166 && !font.palettes.empty());
+    if (const auto it = messages.find("messages/MSG_CH0_0001"); it != messages.end() && !font.Empty()) {
+        const Image text = Pm64::RenderText(font, it->second);
+        CHECK(text.width > 100 && text.height >= 3 * Pm64::kGlyphSize);
+    }
+
+    for (const auto kind : { Pm64::ImageKind::Sprites, Pm64::ImageKind::MapTextures, Pm64::ImageKind::Pictures }) {
+        const auto assets = Pm64::LoadImages(*reader, kind);
+        size_t failures = 0;
+        for (const auto& asset : assets) {
+            const auto image = Pm64::DecodeImage(asset);
+            const auto encoded = image ? Pm64::EncodeImage(asset, ImageOps::Convert(*image, 4)) : std::nullopt;
+            if (!encoded || encoded->preview.rgba != ImageOps::Convert(*image, 4).rgba) {
+                if (failures++ < 5) {
+                    std::printf("    image round trip failed: %s\n", asset.path.c_str());
+                }
+            }
+        }
+        std::printf("  %zu images of kind %d\n", assets.size(), (int)kind);
+        CHECK(!assets.empty());
+        CHECK(failures == 0);
+    }
+}
+
+Image EdgeGradient(int width, int height) {
+    Image image(width, height, 4);
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            uint8_t* p = image.Pixel(x, y);
+            p[0] = (uint8_t)(x * 255 / std::max(width - 1, 1));
+            p[1] = (uint8_t)(y * 255 / std::max(height - 1, 1));
+            p[2] = 0x80;
+            p[3] = x == 0 ? 0 : 0xFF;
+        }
+    }
+    return image;
+}
+
+void TestPm64ImageEncoding() {
+    Pm64::ImageAsset asset;
+    asset.path = "backgrounds/test_bg";
+    asset.texture.type = Otr::TextureType::Palette4bpp;
+    asset.texture.width = 32;
+    asset.texture.height = 16;
+    asset.texture.data.assign(Otr::BufferSize(asset.texture.type, 32, 16), 0);
+    asset.tlutPath = "backgrounds/test_bg_pal0";
+    asset.tlut = Otr::Texture{};
+    asset.tlut->type = Otr::TextureType::RGBA16bpp;
+    asset.tlut->width = 16;
+    asset.tlut->height = 1;
+    asset.tlut->data.assign(32, 0);
+
+    std::string error;
+    CHECK(!Pm64::EncodeImage(asset, EdgeGradient(16, 16), &error) && !error.empty());
+
+    const auto reduced = Pm64::EncodeImage(asset, EdgeGradient(32, 16));
+    CHECK(reduced && reduced->reducedColors && !reduced->mappedToPalette);
+    CHECK(reduced && reduced->textures.size() == 2 && reduced->textures[0].first == asset.path &&
+          reduced->textures[1].first == asset.tlutPath);
+    CHECK(reduced && ImageOps::CountColors(reduced->preview, 64) <= 16);
+    CHECK(reduced && reduced->preview.Pixel(0, 3)[3] == 0 && reduced->preview.Pixel(5, 3)[3] == 0xFF);
+
+    if (reduced) {
+        const auto written = Otr::ExportTexture(reduced->textures[0].second, "test_bg");
+        const auto read = Otr::Texture::Read(std::vector<uint8_t>(written.begin(), written.end()));
+        const auto tlut = Otr::ExportTexture(reduced->textures[1].second, "test_bg_pal0");
+        const auto readTlut = Otr::Texture::Read(std::vector<uint8_t>(tlut.begin(), tlut.end()));
+        CHECK(read && readTlut && read->width == 32 && read->type == Otr::TextureType::Palette4bpp);
+        const auto decoded = read && readTlut ? Otr::TextureCodec::ToImage(*read, &*readTlut) : std::nullopt;
+        CHECK(decoded && ImageOps::Convert(*decoded, 4).rgba == reduced->preview.rgba);
+
+        asset.texture = reduced->textures[0].second;
+        asset.tlut = reduced->textures[1].second;
+        asset.sharedPalette = true;
+        const auto mapped = Pm64::EncodeImage(asset, EdgeGradient(32, 16));
+        CHECK(mapped && mapped->textures.size() == 1 && mapped->mappedToPalette);
+        CHECK(mapped && ImageOps::CountColors(mapped->preview, 64) <= 16);
+    }
+
+    Image few(32, 16, 4);
+    for (size_t i = 0; i < few.rgba.size(); i += 4) {
+        few.rgba[i] = (i / 4) % 3 == 0 ? 0xFF : 0x00;
+        few.rgba[i + 3] = 0xFF;
+    }
+    asset.sharedPalette = false;
+    const auto exact = Pm64::EncodeImage(asset, few);
+    CHECK(exact && !exact->reducedColors && exact->preview.rgba == few.rgba);
 }
 
 void TestFontGenerator() {
@@ -758,6 +850,7 @@ int main() {
         { "real sm64 archive", TestRealSm64Archive },
         { "pm64 text", TestPm64Text },
         { "real pm64 archive", TestRealPm64Archive },
+        { "pm64 image encoding", TestPm64ImageEncoding },
         { "update feed", TestUpdateFeed },
         { "font generator", TestFontGenerator },
         { "gliden order and aliases", TestGlidenOrderAndAliases },

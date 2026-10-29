@@ -453,6 +453,24 @@ std::string DecodeText(const std::vector<uint8_t>& bytes, Charset charset) {
     return out;
 }
 
+std::vector<std::pair<size_t, size_t>> Tokenize(const std::vector<uint8_t>& bytes, Charset charset) {
+    const Table& table = TableFor(charset);
+    std::vector<std::pair<size_t, size_t>> tokens;
+    size_t at = 0;
+    while (at < bytes.size() && bytes[at] != kTerminator) {
+        size_t length = 1;
+        for (const Code* code : table.byFirstByte[bytes[at]]) {
+            if (Matches(*code, bytes, at)) {
+                length = code->prefix.size() + ArgsSize(*code);
+                break;
+            }
+        }
+        tokens.emplace_back(at, length);
+        at += length;
+    }
+    return tokens;
+}
+
 std::optional<std::vector<uint8_t>> EncodeText(std::string_view text, Charset charset, std::string* error) {
     const Table& table = TableFor(charset);
     const auto fail = [&](std::string message) -> std::optional<std::vector<uint8_t>> {
