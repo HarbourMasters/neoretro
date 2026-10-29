@@ -384,9 +384,9 @@ Image Quantize(const Image& image, int maxColors) {
                 continue;
             }
             for (int c = 0; c < 3; c++) {
-                const auto [lo, hi] = std::minmax_element(
-                    boxes[b].pixels.begin(), boxes[b].pixels.end(),
-                    [&](uint32_t x, uint32_t y) { return channel(x, c) < channel(y, c); });
+                const auto [lo, hi] =
+                    std::minmax_element(boxes[b].pixels.begin(), boxes[b].pixels.end(),
+                                        [&](uint32_t x, uint32_t y) { return channel(x, c) < channel(y, c); });
                 const int range = channel(*hi, c) - channel(*lo, c);
                 if (range > targetRange) {
                     target = b;
@@ -400,9 +400,8 @@ Image Quantize(const Image& image, int maxColors) {
         }
         auto& pixels = boxes[target].pixels;
         const auto middle = pixels.begin() + pixels.size() / 2;
-        std::nth_element(pixels.begin(), middle, pixels.end(), [&](uint32_t x, uint32_t y) {
-            return channel(x, targetChannel) < channel(y, targetChannel);
-        });
+        std::nth_element(pixels.begin(), middle, pixels.end(),
+                         [&](uint32_t x, uint32_t y) { return channel(x, targetChannel) < channel(y, targetChannel); });
         Box upper{ std::vector<uint32_t>(middle, pixels.end()) };
         pixels.erase(middle, pixels.end());
         boxes.push_back(std::move(upper));

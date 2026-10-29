@@ -96,8 +96,7 @@ void PaperboatGameScreen::Layout(AppContext& ctx) {
             if (OptionCard(ui, "PaperboatGame_Sprites", Tr("paperboatImageScreen_sprites"), Icons::Face)) {
                 ctx.router.Push("/game_selection/paperboat/sprites");
             }
-            if (OptionCard(ui, "PaperboatGame_MapTextures", Tr("paperboatImageScreen_mapTextures"),
-                           Icons::Landscape)) {
+            if (OptionCard(ui, "PaperboatGame_MapTextures", Tr("paperboatImageScreen_mapTextures"), Icons::Landscape)) {
                 ctx.router.Push("/game_selection/paperboat/map_textures");
             }
             if (OptionCard(ui, "PaperboatGame_Pictures", Tr("paperboatImageScreen_pictures"), Icons::Wallpaper)) {

@@ -199,8 +199,12 @@ std::vector<Candidate> PictureCandidates(const std::set<std::string>& names) {
     std::vector<Candidate> candidates;
     for (const auto& name : names) {
         if (StartsWith(name, "backgrounds/") && EndsWith(name, "_bg")) {
-            candidates.push_back({ name, names.count(name + "_pal0") ? name + "_pal0" : "", false, {},
-                                   PictureGroup(name), Basename(name) });
+            candidates.push_back({ name,
+                                   names.count(name + "_pal0") ? name + "_pal0" : "",
+                                   false,
+                                   {},
+                                   PictureGroup(name),
+                                   Basename(name) });
         } else if ((StartsWith(name, "title_screen/") || StartsWith(name, "story_images/") ||
                     StartsWith(name, "charset/")) &&
                    EndsWith(name, "_img")) {
@@ -340,8 +344,8 @@ std::optional<EncodedImage> EncodeImage(const ImageAsset& asset, const Image& im
         if (!palette) {
             return fail("The palette could not be read");
         }
-        indexed = ImageOps::MapToPalette(image, palette->rgba.data(),
-                                         std::min(palette->width * palette->height, limit));
+        indexed =
+            ImageOps::MapToPalette(image, palette->rgba.data(), std::min(palette->width * palette->height, limit));
         encoded.mappedToPalette = indexed.rgba != image.rgba;
     } else {
         if (ImageOps::CountColors(image, limit) <= limit) {
@@ -381,8 +385,8 @@ std::optional<EncodedImage> EncodeImage(const ImageAsset& asset, const Image& im
 }
 
 std::string DescribeImage(const ImageAsset& asset) {
-    std::string text = fmt::format("{} {}x{}", Otr::TextureTypeName(asset.texture.type), asset.texture.width,
-                                   asset.texture.height);
+    std::string text =
+        fmt::format("{} {}x{}", Otr::TextureTypeName(asset.texture.type), asset.texture.width, asset.texture.height);
     if (!asset.tlutPath.empty()) {
         text += fmt::format("  palette {}", asset.tlutPath.substr(asset.tlutPath.rfind('/') + 1));
     }

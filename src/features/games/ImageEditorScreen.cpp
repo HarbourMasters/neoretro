@@ -107,7 +107,8 @@ void ImageEditorScreen::OnExportAll(AppContext& ctx) {
     Jobs::Instance().Run(
         [state = mState, root = Paths::FromUtf8(*folder), written] {
             for (const auto& entry : state->list.entries) {
-                if (Paths::WriteFile(root / Paths::FromUtf8(entry.path + ".png"), ImageIO::EncodePng(entry.Current()))) {
+                if (Paths::WriteFile(root / Paths::FromUtf8(entry.path + ".png"),
+                                     ImageIO::EncodePng(entry.Current()))) {
                     (*written)++;
                 }
             }
@@ -164,8 +165,8 @@ void ImageEditorScreen::OnImportFolder(AppContext& ctx) {
             state->editor.error = outcome->failures.empty() ? "" : outcome->failures.front();
             state->isProcessing = false;
             if (!outcome->failures.empty()) {
-                toasts.Error(fmt::format(fmt::runtime(Tr("imageEditorScreen_importFailures")),
-                                         outcome->failures.size()));
+                toasts.Error(
+                    fmt::format(fmt::runtime(Tr("imageEditorScreen_importFailures")), outcome->failures.size()));
             }
             Notify(toasts, fmt::format(fmt::runtime(Tr("imageEditorScreen_imported")), outcome->updates.size()));
         });
@@ -232,13 +233,11 @@ void ImageEditorScreen::Layout(AppContext& ctx) {
                     OnSelectArchive();
                 }
                 if (Widgets::Button(ui, id + "_ExportAll", Tr("imageEditorScreen_exportAll"),
-                                    { CLAY_SIZING_FIT(100), CLAY_SIZING_FIXED(50) }, ready,
-                                    Widgets::OutlinedStyle())) {
+                                    { CLAY_SIZING_FIT(100), CLAY_SIZING_FIXED(50) }, ready, Widgets::OutlinedStyle())) {
                     OnExportAll(ctx);
                 }
                 if (Widgets::Button(ui, id + "_ImportFolder", Tr("imageEditorScreen_importFolder"),
-                                    { CLAY_SIZING_FIT(100), CLAY_SIZING_FIXED(50) }, ready,
-                                    Widgets::OutlinedStyle())) {
+                                    { CLAY_SIZING_FIT(100), CLAY_SIZING_FIXED(50) }, ready, Widgets::OutlinedStyle())) {
                     OnImportFolder(ctx);
                 }
             }
