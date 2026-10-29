@@ -151,17 +151,4 @@ void Layout(ClayUi& ui) {
         }
     }
 }
-
-void BlockInputBehind() {
-    if (!Updater::DialogVisible()) {
-        return;
-    }
-    const ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(viewport->WorkPos);
-    ImGui::SetNextWindowSize(viewport->WorkSize);
-    ImGui::Begin("##UpdateDialogBlocker", nullptr,
-                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoSavedSettings |
-                     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoDocking);
-    ImGui::End();
-}
 } // namespace UpdateDialog

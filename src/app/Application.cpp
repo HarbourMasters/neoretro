@@ -161,9 +161,10 @@ void Application::DrawFrame() {
     ImGui::End();
 
     if (screen != nullptr) {
+        ImGui::BeginDisabled(Updater::DialogVisible());
         screen->DrawImGui(*mContext);
+        ImGui::EndDisabled();
     }
-    UpdateDialog::BlockInputBehind();
 
     rlImGuiEnd();
     EndDrawing();
