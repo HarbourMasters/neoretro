@@ -1,10 +1,13 @@
 #include "PaperboatTextScreen.h"
 
+#include "games/pm64/Pm64Font.h"
 #include "games/pm64/Pm64Text.h"
 #include "l10n/Strings.h"
 #include "services/StageManager.h"
+#include "ui/PreviewTexture.h"
 #include "utils/Paths.h"
 
+#include <algorithm>
 #include <imgui.h>
 
 namespace {
@@ -12,7 +15,10 @@ class PaperboatText : public TextEditorGame {
   public:
     Apply LoadArchive(Otr::ArchiveReader& archive) override {
         auto messages = std::make_shared<Pm64::Messages>(Pm64::LoadMessages(archive));
-        return [this, messages](TextEntryList& list) {
+        auto font = std::make_shared<Pm64::Font>(Pm64::LoadFont(archive));
+        return [this, messages, font](TextEntryList& list) {
+            mFont = std::move(*font);
+            mPreviewText.reset();
             mCharsets.clear();
             list.entries.reserve(messages->size());
             for (const auto& [path, bytes] : *messages) {
@@ -48,6 +54,8 @@ class PaperboatText : public TextEditorGame {
     void DrawFields(TextEntry& entry, int index) override {
         if (mCharsets[index] == Pm64::Charset::Credits) {
             ImGui::TextDisabled("%s", Tr("paperboatTextScreen_creditsCharset"));
+        } else if (!mFont.Empty()) {
+            DrawFontPreview(entry, index);
         }
     }
 
@@ -85,7 +93,36 @@ class PaperboatText : public TextEditorGame {
     }
 
   private:
+    void DrawFontPreview(const TextEntry& entry, int index) {
+        if (mPreviewText != entry.text) {
+            mPreviewText = entry.text;
+            const auto bytes = Pm64::EncodeText(entry.text, mCharsets[index]);
+            if (bytes) {
+                const Image image = Pm64::RenderText(mFont, *bytes);
+                mPreview.Upload(image.rgba.data(), image.width, image.height);
+            }
+        }
+        if (!mPreview.Valid()) {
+            return;
+        }
+        constexpr float kScale = 2.0f;
+        constexpr float kPadding = 8.0f;
+        const float maxHeight = std::max(ImGui::GetContentRegionAvail().y * 0.3f, 64.0f);
+        const ImVec2 size(mPreview.Width() * kScale, mPreview.Height() * kScale);
+        ImGui::TextDisabled("%s", Tr("paperboatTextScreen_fontPreview"));
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(244, 236, 214, 255));
+        ImGui::BeginChild("##PaperboatFontPreview", ImVec2(0, std::min(size.y + kPadding * 2, maxHeight)),
+                          ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
+        ImGui::SetCursorPos(ImVec2(kPadding, kPadding));
+        ImGui::Image(ImTextureRef((ImTextureID)mPreview.Id()), size);
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
+    }
+
     std::vector<Pm64::Charset> mCharsets;
+    Pm64::Font mFont;
+    PreviewTexture mPreview;
+    std::optional<std::string> mPreviewText;
 };
 } // namespace
 

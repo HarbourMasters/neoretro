@@ -298,4 +298,132 @@ Image PadCanvas(const Image& image, int width, int height) {
 uint8_t Luminance(const uint8_t* rgba) {
     return (uint8_t)std::clamp(std::lround(0.299 * rgba[0] + 0.587 * rgba[1] + 0.114 * rgba[2]), 0L, 255L);
 }
+
+namespace {
+uint32_t PackColor(const uint8_t* p) {
+    return (uint32_t)p[0] << 24 | (uint32_t)p[1] << 16 | (uint32_t)p[2] << 8 | p[3];
+}
+
+int ColorDistance(const uint8_t* a, const uint8_t* b) {
+    if ((a[3] < 128) != (b[3] < 128)) {
+        return INT32_MAX;
+    }
+    const int dr = a[0] - b[0];
+    const int dg = a[1] - b[1];
+    const int db = a[2] - b[2];
+    return dr * dr * 3 + dg * dg * 4 + db * db * 2;
+}
+} // namespace
+
+int CountColors(const Image& image, int stopAfter) {
+    std::vector<uint32_t> seen;
+    for (size_t i = 0; i < (size_t)image.width * image.height; i++) {
+        const uint32_t color = PackColor(&image.rgba[i * 4]);
+        if (std::find(seen.begin(), seen.end(), color) == seen.end()) {
+            seen.push_back(color);
+            if ((int)seen.size() > stopAfter) {
+                break;
+            }
+        }
+    }
+    return (int)seen.size();
+}
+
+Image MapToPalette(const Image& image, const uint8_t* palette, int colors) {
+    Image out(image.width, image.height, 4);
+    out.hasPalette = true;
+    out.indices.resize((size_t)image.width * image.height);
+    for (int i = 0; i < colors; i++) {
+        out.SetPaletteColor(i, palette[i * 4], palette[i * 4 + 1], palette[i * 4 + 2], palette[i * 4 + 3]);
+    }
+    for (size_t i = 0; i < out.indices.size(); i++) {
+        const uint8_t* pixel = &image.rgba[i * 4];
+        int best = 0;
+        int bestDistance = INT32_MAX;
+        for (int c = 0; c < colors && bestDistance > 0; c++) {
+            const int distance = ColorDistance(pixel, &palette[c * 4]);
+            if (distance < bestDistance) {
+                best = c;
+                bestDistance = distance;
+            }
+        }
+        out.indices[i] = (uint8_t)best;
+    }
+    out.ResolvePalette();
+    return out;
+}
+
+Image Quantize(const Image& image, int maxColors) {
+    struct Box {
+        std::vector<uint32_t> pixels;
+    };
+    const auto channel = [](uint32_t color, int c) { return (int)(color >> (24 - c * 8)) & 0xFF; };
+
+    std::vector<uint32_t> opaque;
+    bool hasTransparent = false;
+    for (size_t i = 0; i < (size_t)image.width * image.height; i++) {
+        const uint8_t* p = &image.rgba[i * 4];
+        if (p[3] < 128) {
+            hasTransparent = true;
+        } else {
+            opaque.push_back((uint32_t)p[0] << 24 | (uint32_t)p[1] << 16 | (uint32_t)p[2] << 8 | 0xFF);
+        }
+    }
+
+    const int budget = std::max(1, maxColors - (hasTransparent ? 1 : 0));
+    std::vector<Box> boxes;
+    if (!opaque.empty()) {
+        boxes.push_back({ std::move(opaque) });
+    }
+    while ((int)boxes.size() < budget) {
+        int target = -1;
+        int targetChannel = 0;
+        int targetRange = 0;
+        for (int b = 0; b < (int)boxes.size(); b++) {
+            if (boxes[b].pixels.size() < 2) {
+                continue;
+            }
+            for (int c = 0; c < 3; c++) {
+                const auto [lo, hi] = std::minmax_element(
+                    boxes[b].pixels.begin(), boxes[b].pixels.end(),
+                    [&](uint32_t x, uint32_t y) { return channel(x, c) < channel(y, c); });
+                const int range = channel(*hi, c) - channel(*lo, c);
+                if (range > targetRange) {
+                    target = b;
+                    targetChannel = c;
+                    targetRange = range;
+                }
+            }
+        }
+        if (target < 0) {
+            break;
+        }
+        auto& pixels = boxes[target].pixels;
+        const auto middle = pixels.begin() + pixels.size() / 2;
+        std::nth_element(pixels.begin(), middle, pixels.end(), [&](uint32_t x, uint32_t y) {
+            return channel(x, targetChannel) < channel(y, targetChannel);
+        });
+        Box upper{ std::vector<uint32_t>(middle, pixels.end()) };
+        pixels.erase(middle, pixels.end());
+        boxes.push_back(std::move(upper));
+    }
+
+    std::vector<uint8_t> palette;
+    if (hasTransparent) {
+        palette.insert(palette.end(), { 0, 0, 0, 0 });
+    }
+    for (const auto& box : boxes) {
+        uint64_t sum[3] = {};
+        for (const uint32_t color : box.pixels) {
+            for (int c = 0; c < 3; c++) {
+                sum[c] += channel(color, c);
+            }
+        }
+        for (int c = 0; c < 3; c++) {
+            palette.push_back((uint8_t)((sum[c] + box.pixels.size() / 2) / box.pixels.size()));
+        }
+        palette.push_back(0xFF);
+    }
+    return MapToPalette(image, palette.data(), (int)palette.size() / 4);
+}
 } // namespace ImageOps

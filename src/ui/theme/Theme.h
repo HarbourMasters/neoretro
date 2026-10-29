@@ -52,6 +52,11 @@ constexpr const char* Translate = "\xee\xa3\xa2";
 constexpr const char* Sailing = "\xee\x94\x82";
 constexpr const char* CheckBox = "\xee\xa0\xb4";
 constexpr const char* CheckBoxOutlineBlank = "\xee\xa0\xb5";
+constexpr const char* Check = "\xee\x97\x8a";
+constexpr const char* Face = "\xee\xa1\xbc";
+constexpr const char* Landscape = "\xee\x8f\xb7";
+constexpr const char* Wallpaper = "\xee\x86\xbc";
+constexpr const char* FontDownload = "\xee\x85\xa7";
 } // namespace Icons
 
 namespace Theme {

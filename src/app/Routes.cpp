@@ -9,6 +9,7 @@
 #include "features/debug/DebugSelectionScreen.h"
 #include "features/games/GameScreens.h"
 #include "features/games/ghostship/GhostshipTextScreen.h"
+#include "features/games/paperboat/PaperboatImageScreen.h"
 #include "features/games/paperboat/PaperboatTextScreen.h"
 #include "features/home/HomeScreen.h"
 #include "features/inspect_otr/InspectOtrScreen.h"
@@ -33,6 +34,12 @@ void RegisterRoutes(Router& router) {
     ghostshipText("/game_selection/ghostship/strings", GhostshipTextKind::Strings);
     route.operator()<PaperboatGameScreen>("/game_selection/paperboat");
     route.operator()<PaperboatTextScreen>("/game_selection/paperboat/strings");
+    auto paperboatImages = [&router](const char* name, Pm64::ImageKind kind) {
+        router.Register(name, [kind] { return std::make_unique<PaperboatImageScreen>(kind); });
+    };
+    paperboatImages("/game_selection/paperboat/sprites", Pm64::ImageKind::Sprites);
+    paperboatImages("/game_selection/paperboat/map_textures", Pm64::ImageKind::MapTextures);
+    paperboatImages("/game_selection/paperboat/pictures", Pm64::ImageKind::Pictures);
     route.operator()<CreateCustomScreen>("/create_custom");
     route.operator()<InspectOtrScreen>("/view_otr");
     route.operator()<CreateCustomSequencesScreen>("/create_custom_sequences");
